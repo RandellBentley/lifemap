@@ -1,0 +1,6 @@
+domain_name           = "journal.example.com"
+hosted_zone_name      = "example.com"
+cognito_domain_prefix = "lifemap-yourname" # globally unique
+acme_email            = "you@example.com"
+geo_allowlist         = ["US"]             # free; [] to allow anywhere
+# instance_type       = "t4g.micro"        # ~$6/mo cheaper, 1 GB RAM

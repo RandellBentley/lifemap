@@ -1,0 +1,29 @@
+{
+	email {$ACME_EMAIL}
+	# Only 443 is reachable (and only from CloudFront); skip the :80 redirect listener.
+	auto_https disable_redirects
+}
+
+# Production: Let's Encrypt via Route 53. Local runs set CADDY_TLS=tls_internal (self-signed).
+(tls_route53) {
+	tls {
+		dns route53
+	}
+}
+
+(tls_internal) {
+	tls internal
+}
+
+{$ORIGIN_DOMAIN} {
+	import {$CADDY_TLS:tls_route53}
+
+	# Only CloudFront knows this header, so requests that bypass it are refused.
+	@cloudfront header X-Origin-Verify {$ORIGIN_VERIFY_SECRET}
+	handle @cloudfront {
+		reverse_proxy web:8000
+	}
+	handle {
+		respond "Forbidden" 403
+	}
+}

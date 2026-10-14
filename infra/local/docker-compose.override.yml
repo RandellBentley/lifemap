@@ -1,0 +1,42 @@
+# Layered on infra/host/docker-compose.yml by scripts/local-prod.sh.
+# Adds local stand-ins for the AWS pieces around the host:
+#   edge            -> CloudFront (SPA files, /api/* to the origin with the secret header)
+#   s3              -> S3 (Moto emulator, also emulates Secrets Manager for the processor)
+#   media-processor -> the Lambda, triggered by polling instead of S3 notifications
+services:
+  web:
+    build: ../../backend
+
+  caddy:
+    networks:
+      default:
+        aliases: [origin] # the "origin.<domain>" DNS name CloudFront uses
+
+  edge:
+    image: caddy:2
+    ports: ["8780:8080"] # host 8080 is commonly taken (e.g. Keycloak)
+    environment:
+      ORIGIN_VERIFY_SECRET: ${ORIGIN_VERIFY_SECRET}
+    volumes:
+      - ../local/Caddyfile.edge:/etc/caddy/Caddyfile:ro
+      - ../../frontend/dist:/srv/frontend:ro
+    depends_on: [caddy]
+
+  s3:
+    image: motoserver/moto:5.2.3
+    ports: ["9100:5000"]
+
+  media-processor:
+    build:
+      context: ../../media-processor
+      dockerfile: Dockerfile.local
+    environment:
+      AWS_ENDPOINT_URL: http://s3:5000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_DEFAULT_REGION: us-east-1
+      MEDIA_BUCKET: ${MEDIA_BUCKET}
+      API_BASE_URL: http://edge:8080 # callbacks go through "CloudFront", as in AWS
+      APP_SECRET_ARN: lifemap-local/app
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+    depends_on: [s3, edge]

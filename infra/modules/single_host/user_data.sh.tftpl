@@ -1,0 +1,59 @@
+#!/bin/bash
+# First-boot bootstrap (Amazon Linux 2023, arm64). Only installs the base system;
+# the app itself is installed by `lifemap-deploy`, which scripts/deploy.sh runs via SSM.
+set -euxo pipefail
+exec > >(tee -a /var/log/lifemap-bootstrap.log) 2>&1
+
+cat > /etc/lifemap.conf <<EOF
+OPS_BUCKET=${ops_bucket}
+AWS_REGION=${region}
+EOF
+
+# Swap: headroom for building the Caddy image and for memory spikes on small instances.
+if [ ! -f /swapfile ]; then
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+# Docker + Compose plugin
+dnf install -y docker dnf-automatic
+systemctl enable --now docker
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
+  -o /usr/libexec/docker/cli-plugins/docker-compose
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# Apply security updates automatically.
+sed -i 's/^upgrade_type.*/upgrade_type = security/; s/^apply_updates.*/apply_updates = yes/' /etc/dnf/automatic.conf
+systemctl enable --now dnf-automatic.timer
+
+# Data volume for Postgres. Attached after the instance starts, so wait for it.
+DEV=/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${volume_serial}
+for i in $(seq 1 60); do
+  [ -e "$DEV" ] && break
+  sleep 5
+done
+if ! blkid "$DEV"; then
+  mkfs.xfs "$DEV" # only on first boot of a brand-new volume
+fi
+mkdir -p /data
+UUID=$(blkid -s UUID -o value "$DEV")
+grep -q "$UUID" /etc/fstab || echo "UUID=$UUID /data xfs defaults,nofail 0 2" >> /etc/fstab
+mount -a
+
+# Entry point for deploys: pull host config from S3, then run the versioned deploy script.
+cat > /usr/local/bin/lifemap-deploy <<'EOF'
+#!/bin/bash
+set -euo pipefail
+source /etc/lifemap.conf
+cloud-init status --wait >/dev/null || true
+mkdir -p /opt/lifemap
+aws s3 sync "s3://$OPS_BUCKET/host/" /opt/lifemap/ --delete \
+  --exclude ".env" --exclude "app.env" --exclude "cloudfront_key.pem"
+aws s3 cp "s3://$OPS_BUCKET/config/app.env" /opt/lifemap/app.env --only-show-errors
+exec bash /opt/lifemap/deploy.sh "$@"
+EOF
+chmod +x /usr/local/bin/lifemap-deploy

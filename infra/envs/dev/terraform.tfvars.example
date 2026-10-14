@@ -1,0 +1,3 @@
+domain_name           = "dev.lifemap.example.com"
+hosted_zone_name      = "example.com"
+cognito_domain_prefix = "lifemap-dev-yourname" # globally unique

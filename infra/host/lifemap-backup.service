@@ -1,0 +1,8 @@
+[Unit]
+Description=LifeMap Postgres backup to S3
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/lifemap/backup.sh
