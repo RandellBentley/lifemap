@@ -1,0 +1,7 @@
+# Who reviews what. One owner today; on a team each area would map to its own reviewers.
+*                @RandellBentley
+/backend/        @RandellBentley
+/frontend/       @RandellBentley
+/infra/          @RandellBentley
+/media-processor/ @RandellBentley
+/.github/        @RandellBentley
