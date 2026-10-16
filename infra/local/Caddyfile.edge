@@ -7,7 +7,7 @@
 :8080 {
 	# /api/* -> origin, adding the secret header CloudFront adds in production.
 	handle /api/* {
-		reverse_proxy https://origin:443 {
+		reverse_proxy https://origin:8443 {
 			header_up Host origin
 			header_up X-Origin-Verify {$ORIGIN_VERIFY_SECRET}
 			transport http {

@@ -1,6 +1,8 @@
 {
 	email {$ACME_EMAIL}
-	# Only 443 is reachable (and only from CloudFront); skip the :80 redirect listener.
+	# Unprivileged listener; the host maps 443 -> 8443. Only that port is reachable
+	# (and only from CloudFront), so skip the :80 redirect listener.
+	https_port 8443
 	auto_https disable_redirects
 }
 
