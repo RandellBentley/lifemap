@@ -92,6 +92,9 @@ data "aws_cloudfront_cache_policy" "disabled" { name = "Managed-CachingDisabled"
 data "aws_cloudfront_origin_request_policy" "all_viewer_except_host" { name = "Managed-AllViewerExceptHostHeader" }
 data "aws_cloudfront_response_headers_policy" "security" { name = "Managed-SecurityHeadersPolicy" }
 
+# No WAF (~$5-8/month base) for a single-user site: the origin only accepts CloudFront plus a
+# secret header, geo-restriction is available, and Django rate-limits. Revisit for public demos.
+#trivy:ignore:AWS-0011
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   is_ipv6_enabled     = true
