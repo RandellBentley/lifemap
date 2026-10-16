@@ -112,7 +112,7 @@ def _stable_expiry() -> dt.datetime:
     # signed URL for a while; that keeps browser and CloudFront caches effective.
     ttl = settings.MEDIA_URL_TTL
     expires = math.ceil((time.time() + ttl) / ttl) * ttl
-    return dt.datetime.fromtimestamp(expires, tz=dt.timezone.utc)
+    return dt.datetime.fromtimestamp(expires, tz=dt.UTC)
 
 
 def media_url(key: str | None) -> str | None:

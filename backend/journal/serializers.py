@@ -11,7 +11,7 @@ def validate_timezone_name(value):
     try:
         ZoneInfo(value)
     except (ZoneInfoNotFoundError, ValueError):
-        raise serializers.ValidationError("Unknown time zone.")
+        raise serializers.ValidationError("Unknown time zone.") from None
     return value
 
 

@@ -65,7 +65,8 @@ class GoalApiTests(TestCase):
 
     def test_milestones_ordering_and_media(self, *_):
         goal = self.create_goal()
-        add = lambda **d: self.client.post(f"/api/goals/{goal['id']}/milestones/", d, format="json")
+        def add(**d):
+            return self.client.post(f"/api/goals/{goal['id']}/milestones/", d, format="json")
         add(title="Undated idea")
         add(title="Half marathon", occurred_on="2026-06-01", description="2:05!")
         later = add(title="30k long run", occurred_on="2026-08-15").data
@@ -105,7 +106,8 @@ class GoalApiTests(TestCase):
 
     def test_markers(self, *_):
         goal = self.create_goal(starts_on="2026-01-15", reward="Watch")
-        add = lambda **d: self.client.post(f"/api/goals/{goal['id']}/milestones/", d, format="json").data
+        def add(**d):
+            return self.client.post(f"/api/goals/{goal['id']}/milestones/", d, format="json").data
         add(title="Undated")  # never a marker
         half = add(title="Half marathon", occurred_on="2026-06-01")
         add(title="10k", occurred_on="2026-03-10")
@@ -234,8 +236,9 @@ class MetricTests(TestCase):
         self.assertAlmostEqual(p["progress"], 5 / 90)
 
     def test_validation(self):
-        bad = lambda **d: self.client.post(f"/api/goals/{self.goal.id}/metrics/", {"name": "X", "mode": "latest", **d},
-                                           format="json")
+        def bad(**d):
+            return self.client.post(f"/api/goals/{self.goal.id}/metrics/", {"name": "X", "mode": "latest", **d},
+                                                   format="json")
         self.assertIn("unit", bad(kind="weight", unit="stone").data)
         self.assertIn("unit", bad(kind="money", unit="dollars").data)
         self.assertIn("kind", bad(kind="calories", unit="kcal").data)

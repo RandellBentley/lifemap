@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from journal.models import MediaAsset
 from journal.serializers import UploadRequestSerializer
 from journal.uploads import delete_media, issue_upload
-
 from journal.views import parse_date
 
 from .markers import goal_markers
