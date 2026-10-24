@@ -1,7 +1,7 @@
 Django>=5.2,<5.3
 djangorestframework>=3.16,<4
 psycopg[binary]>=3.2,<4
-boto3>=1.40,<2
+boto3>=1.43.117,<2
 PyJWT[crypto]>=2.10,<3
 requests>=2.32,<3
 gunicorn>=23
