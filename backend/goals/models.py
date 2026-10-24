@@ -102,3 +102,6 @@ class Measurement(models.Model):
             # A milestone records at most one value per metric.
             models.UniqueConstraint(fields=["milestone", "metric"], name="one_reading_per_metric_per_milestone")
         ]
+
+    def __str__(self):
+        return f"{self.metric.name} on {self.recorded_on}"

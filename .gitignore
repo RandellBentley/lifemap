@@ -1,2 +1,7 @@
 .DS_Store
 .env
+
+# Test/lint artifacts
+.coverage
+htmlcov/
+.ruff_cache/

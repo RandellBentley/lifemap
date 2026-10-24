@@ -32,6 +32,9 @@ resource "aws_s3_bucket_versioning" "state" {
   versioning_configuration { status = "Enabled" }
 }
 
+# SSE-S3 (AES-256) at rest; the bucket is private, versioned and IAM-controlled. A customer-managed
+# KMS key (~$1/month) would add a separate key policy and audit trail; not needed for one operator.
+#trivy:ignore:AWS-0132
 resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
   bucket = aws_s3_bucket.state.id
   rule {

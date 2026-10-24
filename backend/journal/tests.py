@@ -237,7 +237,8 @@ class EventApiTests(TestCase):
     def test_ongoing_event_and_overlap_filter(self, _delete):
         self.create_event(title="Summer", starts_on="2026-06-01", ends_on="2026-06-30")
         self.create_event(title="Sabbatical", starts_on="2026-08-15", ends_on=None)  # still going
-        titles = lambda q: sorted(e["title"] for e in self.client.get(f"/api/events/?{q}").data)
+        def titles(q):
+            return sorted(e["title"] for e in self.client.get(f"/api/events/?{q}").data)
         self.assertEqual(titles("start=2026-06-20&end=2026-06-25"), ["Summer"])
         self.assertEqual(titles("start=2027-01-01&end=2027-01-31"), ["Sabbatical"])
         self.assertEqual(titles("start=2026-07-01&end=2026-08-01"), [])

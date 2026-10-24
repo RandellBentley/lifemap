@@ -1,5 +1,8 @@
 # LifeMap
 
+[![CI](https://github.com/RandellBentley/lifemap/actions/workflows/ci.yml/badge.svg)](https://github.com/RandellBentley/lifemap/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/RandellBentley/lifemap/actions/workflows/codeql.yml/badge.svg)](https://github.com/RandellBentley/lifemap/actions/workflows/codeql.yml)
+
 A private journal for documenting events: entries with text, photos, and videos, organized by tags and browsable as a timeline or calendar.
 
 ```
@@ -48,6 +51,32 @@ Backend tests:
 ```bash
 cd backend && python -m venv .venv && .venv/bin/pip install -r requirements.txt
 DJANGO_DEBUG=1 .venv/bin/python manage.py test
+```
+
+## Continuous integration
+
+Every pull request runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Each job runs only when its area changed, and branch protection requires the single **CI passed** check, so a skipped job never blocks a merge.
+
+| Job | Checks |
+|---|---|
+| Backend | ruff lint, migrations in sync with models, Django tests against Postgres 17, coverage ≥ 85% (summary posted to the run) |
+| Backend image | Docker build, Trivy scan; fails on fixable HIGH/CRITICAL vulnerabilities |
+| Frontend | clean `npm ci`, TypeScript typecheck, production build |
+| Infrastructure | `terraform fmt`, `validate` for every root, Trivy config scan of Terraform and the host Dockerfile |
+| Secret scan | gitleaks over the full git history |
+
+[CodeQL](.github/workflows/codeql.yml) analyzes the Python and TypeScript for security issues on every PR and weekly. Dependabot proposes grouped weekly updates for Actions, pip, npm, Terraform, and Docker base images. Third-party actions are pinned to commit SHAs.
+
+**Security-scan exceptions** are inline `#trivy:ignore` comments next to the resource, each with its reason (e.g. the ALB is internet-facing but only reachable from CloudFront with a secret header).
+
+Run the same checks locally:
+
+```bash
+pip install -r backend/requirements-dev.txt
+ruff check backend media-processor
+(cd backend && DJANGO_DEBUG=1 coverage run manage.py test && coverage report)
+(cd frontend && npm ci && npm run build)
+terraform -chdir=infra fmt -check -recursive
 ```
 
 ## Local production-like stack

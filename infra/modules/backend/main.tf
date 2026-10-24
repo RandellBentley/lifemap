@@ -175,6 +175,9 @@ resource "aws_acm_certificate_validation" "origin" {
   validation_record_fqdns = [for r in aws_route53_record.origin_validation : r.fqdn]
 }
 
+# Internet-facing by design: CloudFront is the only client. The security group admits only
+# CloudFront's origin-facing prefix list, and the listener rejects requests without the secret header.
+#trivy:ignore:AWS-0053
 resource "aws_lb" "this" {
   name                       = var.name
   load_balancer_type         = "application"
@@ -262,6 +265,9 @@ resource "aws_vpc_security_group_ingress_rule" "app_from_alb" {
   to_port                      = 8000
 }
 
+# Tasks reach Cognito, ECR, Secrets Manager and S3 over HTTPS. Restricting egress means one
+# interface VPC endpoint per service (~$7/month each); accepted for this deployment.
+#trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "app_all" {
   security_group_id = aws_security_group.app.id
   cidr_ipv4         = "0.0.0.0/0"

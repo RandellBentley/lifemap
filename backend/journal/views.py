@@ -19,19 +19,19 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from . import storage
-from .uploads import issue_upload
 from .models import Entry, Event, MediaAsset, Tag
 from .serializers import (
     EntrySerializer,
-    EventUploadRequestSerializer,
     EventSerializer,
     EventSummarySerializer,
-    event_covers,
+    EventUploadRequestSerializer,
     MediaAssetSerializer,
     ProcessedMediaSerializer,
     TagSerializer,
     UploadRequestSerializer,
+    event_covers,
 )
+from .uploads import issue_upload
 
 log = logging.getLogger(__name__)
 
@@ -43,14 +43,14 @@ def parse_instant(value, field):
         parsed = None
     if parsed is None:
         raise ValidationError({field: "Expected an ISO 8601 timestamp."})
-    return parsed if timezone.is_aware(parsed) else timezone.make_aware(parsed, dt.timezone.utc)
+    return parsed if timezone.is_aware(parsed) else timezone.make_aware(parsed, dt.UTC)
 
 
 def parse_date(value, field):
     try:
         return dt.date.fromisoformat(value)
     except (TypeError, ValueError):
-        raise ValidationError({field: "Expected YYYY-MM-DD."})
+        raise ValidationError({field: "Expected YYYY-MM-DD."}) from None
 
 
 class TimelinePagination(CursorPagination):
@@ -116,7 +116,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             limit = max(1, min(int(params.get("limit", 30)), 100))
         except ValueError:
-            raise ValidationError({"limit": "Expected an integer."})
+            raise ValidationError({"limit": "Expected an integer."}) from None
 
         qs = self.get_queryset()
         if "after" in params:
@@ -126,7 +126,9 @@ class EntryViewSet(viewsets.ModelViewSet):
         else:
             if "before" in params:
                 at, before_id = parse_instant(params["before"], "before"), params.get("before_id")
-                cond = Q(occurred_at__lt=at) | Q(occurred_at=at, id__lt=before_id) if before_id else Q(occurred_at__lt=at)
+                cond = (
+                    Q(occurred_at__lt=at) | Q(occurred_at=at, id__lt=before_id) if before_id else Q(occurred_at__lt=at)
+                )
                 qs = qs.filter(cond)
             rows = list(qs.order_by("-occurred_at", "-id")[: limit + 1])
 
@@ -259,7 +261,9 @@ class EventViewSet(viewsets.ModelViewSet):
             # Lock the event so parallel uploads for a new day create one entry, not several.
             event = get_object_or_404(Event.objects.select_for_update(), pk=self.get_object().pk)
             day, moment, outside = place_in_event(event, data.get("captured_at"))
-            entry = Entry.objects.filter(user=request.user, event=event, occurred_on=day).order_by("occurred_at").first()
+            entry = (
+                Entry.objects.filter(user=request.user, event=event, occurred_on=day).order_by("occurred_at").first()
+            )
             created = entry is None
             if created:
                 entry = Entry.objects.create(
@@ -390,7 +394,7 @@ def calendar(request):
         year, month = (int(p) for p in request.query_params.get("month", "").split("-"))
         first = dt.date(year, month, 1)
     except ValueError:
-        raise ValidationError({"month": "Expected YYYY-MM."})
+        raise ValidationError({"month": "Expected YYYY-MM."}) from None
     last = (first + dt.timedelta(days=32)).replace(day=1) - dt.timedelta(days=1)
 
     entries = Entry.objects.filter(user=request.user, occurred_on__range=(first, last))

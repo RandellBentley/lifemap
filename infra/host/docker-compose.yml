@@ -40,7 +40,7 @@ services:
       dockerfile: caddy.Dockerfile
     image: lifemap-caddy
     restart: unless-stopped
-    ports: ["${ORIGIN_PORT:-443}:443"]
+    ports: ["${ORIGIN_PORT:-443}:8443"] # Caddy runs as non-root on 8443
     environment:
       ORIGIN_DOMAIN: ${ORIGIN_DOMAIN}
       ORIGIN_VERIFY_SECRET: ${ORIGIN_VERIFY_SECRET}
