@@ -252,3 +252,10 @@ export interface GoalMarker {
   thumb: string | null
   reward?: string
 }
+
+/** Per-environment switches (GET /api/config/). Mirrors KNOWN_FEATURES in backend settings. */
+export type Feature = 'workouts'
+
+export interface AppConfig {
+  features: Feature[]
+}

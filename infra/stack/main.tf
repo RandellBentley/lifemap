@@ -40,6 +40,11 @@ variable "db_instance_class" {
   type    = string
   default = "db.t4g.micro"
 }
+variable "features" {
+  description = "Feature flags to switch on (FEATURES env var), e.g. [\"workouts\"]. Empty = none."
+  type        = list(string)
+  default     = []
+}
 variable "desired_count" {
   type    = number
   default = 1
@@ -128,6 +133,7 @@ module "backend" {
   origin_verify_secret = random_password.origin_verify.result
   image_tag            = var.image_tag
   desired_count        = var.desired_count
+  features             = var.features
 
   db = {
     address           = module.database.address

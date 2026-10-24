@@ -1,10 +1,12 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, cursorQuery } from './client'
 import type {
+  AppConfig,
   CalendarMonth,
   Entry,
   EntryInput,
   EventInput,
+  Feature,
   Goal,
   GoalInput,
   GoalMarker,
@@ -44,6 +46,23 @@ export function useMe() {
     },
     staleTime: 5 * 60_000,
   })
+}
+
+/** Which features this environment has on. Fixed for the life of the deployment, so fetch once. */
+export function useAppConfig() {
+  return useQuery({
+    queryKey: ['config'],
+    queryFn: () => api<AppConfig>('/config/'),
+    staleTime: Infinity,
+  })
+}
+
+/**
+ * Whether a feature is on here. False while loading, so flagged UI never flashes in.
+ * Hiding UI is cosmetic; the backend answers 404 for disabled features regardless.
+ */
+export function useFeature(name: Feature): boolean {
+  return useAppConfig().data?.features.includes(name) ?? false
 }
 
 export async function logout() {

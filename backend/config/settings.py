@@ -175,6 +175,14 @@ MEDIA_PROCESSING_ENABLED = env_bool("MEDIA_PROCESSING_ENABLED", False)
 # Shared secret the media-processing Lambda uses to report results.
 INTERNAL_API_TOKEN = env("INTERNAL_API_TOKEN", "")
 
+# --- Feature flags ------------------------------------------------------------------
+# Per-environment switches, e.g. FEATURES=workouts on the personal site and nothing on the
+# public demo. Same code everywhere; only configuration differs. See config/features.py.
+KNOWN_FEATURES = {"workouts"}
+FEATURES = frozenset(env_list("FEATURES", ""))
+if unknown := FEATURES - KNOWN_FEATURES:
+    raise RuntimeError(f"Unknown FEATURES {sorted(unknown)}; known: {sorted(KNOWN_FEATURES)}")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

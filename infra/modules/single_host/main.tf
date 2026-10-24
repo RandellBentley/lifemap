@@ -39,6 +39,11 @@ variable "db_dump_retention_days" {
   type    = number
   default = 35
 }
+variable "features" {
+  description = "Feature flags to switch on (FEATURES env var), e.g. [\"workouts\"]. Empty = none."
+  type        = list(string)
+  default     = []
+}
 variable "termination_protection" {
   type    = bool
   default = true
@@ -267,6 +272,7 @@ locals {
     CLOUDFRONT_MEDIA_BASE_URL   = local.app_url
     CLOUDFRONT_KEY_PAIR_ID      = var.cloudfront_key_pair_id
     MEDIA_PROCESSING_ENABLED    = "1"
+    FEATURES                    = join(",", var.features)
     # Used by the host scripts / Caddy, ignored by Django:
     ORIGIN_DOMAIN      = var.origin_domain
     ACME_EMAIL         = var.acme_email
