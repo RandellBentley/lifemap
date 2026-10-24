@@ -79,6 +79,16 @@ ruff check backend media-processor
 terraform -chdir=infra fmt -check -recursive
 ```
 
+## Feature flags
+
+Some features are personal-site only (workout tracking first). Rather than separate codebases, environments differ only in the `FEATURES` setting, set per environment in Terraform (`features = ["workouts"]` for personal, empty for the demo):
+
+- **Backend:** flagged views use `permission_classes = [requires_feature("workouts"), IsAuthenticated]` and answer **404** when the flag is off.
+- **Frontend:** `GET /api/config/` lists enabled features; `useFeature()` / `<FeatureGate>` hide the UI.
+- Unknown names fail at startup. See [ADR 0002](docs/adr/0002-feature-flags.md).
+
+Design decisions are recorded in [`docs/adr/`](docs/adr/).
+
 ## Local production-like stack
 
 `docker compose up` is the fast dev loop: hot reload, `DEBUG=1`, and the Vite dev server. To test what will actually run in the cloud, use:
