@@ -1,7 +1,8 @@
 # Layered on infra/host/docker-compose.yml by scripts/local-prod.sh.
 # Adds local stand-ins for the AWS pieces around the host:
 #   edge            -> CloudFront (SPA files, /api/* to the origin with the secret header)
-#   s3              -> S3 (Moto emulator, also emulates Secrets Manager for the processor)
+#   s3              -> S3 (SeaweedFS, stored on disk in infra/local/.data/s3)
+#   secrets         -> Secrets Manager for the processor (Moto, in-memory; recreated on start)
 #   media-processor -> the Lambda, triggered by polling instead of S3 notifications
 services:
   web:
@@ -22,16 +23,30 @@ services:
       - ../../frontend/dist:/srv/frontend:ro
     depends_on: [caddy]
 
+  # SeaweedFS rather than Moto: Moto keeps objects in memory, so every Docker restart
+  # left the database pointing at photos that no longer existed.
   s3:
+    image: chrislusf/seaweedfs:4.48
+    command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data -ip.bind=0.0.0.0
+    ports: ["9100:8333"]
+    volumes:
+      - ../local/.data/s3:/data
+      - ../local/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 2s
+      retries: 30
+
+  secrets:
     image: motoserver/moto:5.2.3
-    ports: ["9100:5000"]
 
   media-processor:
     build:
       context: ../../media-processor
       dockerfile: Dockerfile.local
     environment:
-      AWS_ENDPOINT_URL: http://s3:5000
+      AWS_ENDPOINT_URL_S3: http://s3:8333
+      AWS_ENDPOINT_URL_SECRETS_MANAGER: http://secrets:5000
       AWS_ACCESS_KEY_ID: local
       AWS_SECRET_ACCESS_KEY: local
       AWS_DEFAULT_REGION: us-east-1
@@ -39,4 +54,4 @@ services:
       API_BASE_URL: http://edge:8080 # callbacks go through "CloudFront", as in AWS
       APP_SECRET_ARN: lifemap-local/app
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
-    depends_on: [s3, edge]
+    depends_on: [s3, secrets, edge]

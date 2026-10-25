@@ -151,7 +151,7 @@ COGNITO_DOMAIN = env("COGNITO_DOMAIN", "").rstrip("/")  # https://<prefix>.auth.
 # --- Media storage ---------------------------------------------------------------
 AWS_REGION = env("AWS_REGION", "us-east-1")
 MEDIA_BUCKET = env("MEDIA_BUCKET", "lifemap-media-local")
-# Local MinIO: the server talks to http://minio:9000, but presigned URLs must use a
+# Local S3 emulator: the server talks to e.g. http://s3:8333, but presigned URLs must use a
 # host the browser can reach, so they are signed against the public endpoint.
 AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL") or None
 AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL") or AWS_S3_ENDPOINT_URL

@@ -38,7 +38,7 @@ Key decisions:
 Requirements: Docker, Node 22+, Python 3.11+.
 
 ```bash
-docker compose up -d          # Postgres, S3 emulator (Moto) on :9000, Django on :8000
+docker compose up -d          # Postgres, S3 emulator (SeaweedFS) on :9000, Django on :8000
 docker compose exec backend python manage.py createsuperuser
 
 cd frontend && npm install && npm run dev    # http://localhost:5173
@@ -106,7 +106,8 @@ This runs **the same `infra/host/docker-compose.yml` that runs on EC2**: the Cad
 | AWS | Local stand-in |
 |---|---|
 | CloudFront | `edge` (Caddy on :8780): serves the built SPA, sends `/api/*` to the origin with the secret header |
-| S3 + Secrets Manager | Moto emulator on :9100 |
+| S3 | SeaweedFS on :9100, stored on disk in `infra/local/.data/s3` |
+| Secrets Manager | Moto (in-memory; the processor recreates its secret on start) |
 | S3 → Lambda trigger | `media-processor` polls the bucket and runs the real `handler.py` |
 | Cognito | `AUTH_MODE=local` (admin login), or a real Cognito pool, see below |
 | Let's Encrypt | Caddy's self-signed certificate (`CADDY_TLS=tls_internal`) |
