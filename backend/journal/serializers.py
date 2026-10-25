@@ -67,6 +67,13 @@ class MediaAssetSerializer(serializers.ModelSerializer):
         if asset.goal_id:
             return {"kind": "goal", "id": str(asset.goal_id), "title": asset.goal.title, "goal_id": str(asset.goal_id),
                     "date": asset.goal.starts_on.isoformat() if asset.goal.starts_on else None}
+        if asset.workout_set_id:
+            we = asset.workout_set.workout_exercise
+            return {"kind": "workout_set", "id": str(asset.workout_set_id), "workout_id": str(we.workout_id),
+                    "title": we.exercise.name, "date": we.workout.performed_on.isoformat()}
+        if asset.progress_report_id:
+            report = asset.progress_report
+            return {"kind": "progress_report", "id": str(report.id), "date": report.recorded_on.isoformat()}
         m = asset.milestone
         return {"kind": "milestone", "id": str(m.id), "title": m.title, "goal_id": str(m.goal_id),
                 "goal_title": m.goal.title, "date": m.occurred_on.isoformat() if m.occurred_on else None}

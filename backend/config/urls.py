@@ -9,4 +9,5 @@ urlpatterns = [
     path("api/config/", config, name="config"),
     path("api/", include("journal.urls")),
     path("api/", include("goals.urls")),
+    path("api/", include("workouts.urls")),
 ]
