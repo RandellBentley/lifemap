@@ -55,8 +55,9 @@ class WorkoutExercise(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workout = models.ForeignKey(Workout, on_delete=models.CASCADE, related_name="exercises")
-    # PROTECT: an exercise with history can be renamed but not deleted, so old workouts keep it.
-    exercise = models.ForeignKey(Exercise, on_delete=models.PROTECT, related_name="uses")
+    # RESTRICT: an exercise with history can be renamed but not deleted, so old workouts keep it.
+    # Unlike PROTECT, it still allows deleting the whole account, which removes both together.
+    exercise = models.ForeignKey(Exercise, on_delete=models.RESTRICT, related_name="uses")
     position = models.PositiveIntegerField(default=0)
 
     class Meta:

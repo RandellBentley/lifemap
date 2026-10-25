@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ('position', models.PositiveIntegerField(default=0)),
-                ('exercise', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='uses', to='workouts.exercise')),
+                ('exercise', models.ForeignKey(on_delete=django.db.models.deletion.RESTRICT, related_name='uses', to='workouts.exercise')),
                 ('workout', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='exercises', to='workouts.workout')),
             ],
             options={

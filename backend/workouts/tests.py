@@ -75,6 +75,11 @@ class WorkoutApiTests(TestCase):
 
     # --- workouts -----------------------------------------------------------------------
 
+    def test_user_with_workouts_can_be_deleted(self, *_):
+        self.create_workout()
+        self.user.delete()
+        self.assertFalse(Exercise.objects.exists())
+
     def test_create_and_list_workout(self, *_):
         workout = self.create_workout()
         self.assertEqual([e["exercise_name"] for e in workout["exercises"]], ["Snatch", "Clean and Jerk"])
