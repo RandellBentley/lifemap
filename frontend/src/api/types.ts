@@ -30,6 +30,8 @@ export type MediaOwner =
   | { kind: 'entry'; id: string }
   | { kind: 'goal'; id: string; title: string; goal_id: string; date: string | null }
   | { kind: 'milestone'; id: string; title: string; goal_id: string; goal_title: string; date: string | null }
+  | { kind: 'workout_set'; id: string; workout_id: string; title: string; date: string }
+  | { kind: 'progress_report'; id: string; date: string }
 
 export interface MediaAsset {
   id: string
@@ -258,4 +260,60 @@ export type Feature = 'workouts'
 
 export interface AppConfig {
   features: Feature[]
+}
+
+// --- Workouts (personal site only; behind the `workouts` feature flag) -------------------
+
+export interface Exercise {
+  id: string
+  name: string
+  use_count: number
+  created_at: string
+}
+
+/** Weights are always kilograms over the API; the UI shows kg or lb. */
+export interface WorkoutSet {
+  id: string
+  reps: number
+  weight_kg: number | null
+  video: MediaAsset | null
+}
+
+export interface WorkoutExercise {
+  id: string
+  exercise: string
+  exercise_name: string
+  sets: WorkoutSet[]
+}
+
+export interface Workout {
+  id: string
+  performed_on: string
+  notes: string
+  exercises: WorkoutExercise[]
+  created_at: string
+  updated_at: string
+}
+
+/** Nested write: ids keep existing exercises/sets (and their videos); omit them for new ones. */
+export interface WorkoutInput {
+  performed_on: string
+  notes: string
+  exercises: { id?: string; exercise: string; sets: { id?: string; reps: number; weight_kg: number | null }[] }[]
+}
+
+export interface ProgressReport {
+  id: string
+  recorded_on: string
+  body_weight_kg: number | null
+  notes: string
+  photos: MediaAsset[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgressReportInput {
+  recorded_on: string
+  body_weight_kg: number | null
+  notes: string
 }

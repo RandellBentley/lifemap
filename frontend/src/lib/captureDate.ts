@@ -1,4 +1,3 @@
-import exifr from 'exifr'
 
 export type CaptureSource = 'exif' | 'filename' | 'file'
 
@@ -19,6 +18,8 @@ export async function readCaptureDate(file: File): Promise<CaptureDate> {
   if (file.type.startsWith('image/')) {
     try {
       // reviveValues: false keeps "YYYY:MM:DD HH:MM:SS" as written, without shifting zones.
+      // Loaded on first use: only event photo uploads need it, so it stays out of the main bundle.
+      const { default: exifr } = await import('exifr')
       const tags = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate'], reviveValues: false })
       const raw: unknown = tags?.DateTimeOriginal ?? tags?.CreateDate
       if (typeof raw === 'string' && /^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}/.test(raw)) {

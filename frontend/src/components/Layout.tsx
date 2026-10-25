@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { logout, useMe } from '../api/hooks'
+import { FeatureGate } from './FeatureGate'
 
 export function Layout({ children }: { children: ReactNode }) {
   const { data: user } = useMe()
@@ -17,6 +18,9 @@ export function Layout({ children }: { children: ReactNode }) {
             <NavLink to="/calendar">Calendar</NavLink>
             <NavLink to="/photos">Photos</NavLink>
             <NavLink to="/goals">Goals</NavLink>
+            <FeatureGate feature="workouts">
+              <NavLink to="/workouts">Workouts</NavLink>
+            </FeatureGate>
           </nav>
           <div className="spacer" />
           <NewMenu />
@@ -73,6 +77,12 @@ function NewMenu() {
             <strong>Goal</strong>
             <span className="muted small">Something you’re working toward, with milestones</span>
           </Link>
+          <FeatureGate feature="workouts">
+            <Link role="menuitem" to="/workouts/new">
+              <strong>Workout</strong>
+              <span className="muted small">Exercises, sets, reps and weight</span>
+            </Link>
+          </FeatureGate>
         </div>
       )}
     </div>

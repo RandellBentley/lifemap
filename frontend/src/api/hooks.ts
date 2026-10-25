@@ -6,6 +6,7 @@ import type {
   Entry,
   EntryInput,
   EventInput,
+  Exercise,
   Feature,
   Goal,
   GoalInput,
@@ -19,10 +20,14 @@ import type {
   Milestone,
   MilestoneInput,
   Page,
+  ProgressReport,
+  ProgressReportInput,
   Tag,
   TimelineSummary,
   User,
   WindowSlice,
+  Workout,
+  WorkoutInput,
 } from './types'
 
 /**
@@ -199,7 +204,7 @@ export function useTags() {
   return useQuery({ queryKey: ['tags'], queryFn: () => api<Tag[]>('/tags/') })
 }
 
-const JOURNAL_KEYS = ['entries', 'entry', 'calendar', 'tags', 'events', 'event', 'goals', 'goal']
+const JOURNAL_KEYS = ['entries', 'entry', 'calendar', 'tags', 'events', 'event', 'goals', 'goal', 'workouts', 'workout']
 
 /**
  * Anything that changes entries or media can affect every list view.
@@ -450,6 +455,83 @@ export function useDeleteMeasurement() {
   const invalidate = useInvalidateJournal()
   return useMutation({
     mutationFn: (id: string) => api<void>(`/measurements/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate(),
+  })
+}
+
+// --- Workouts -------------------------------------------------------------------------
+
+export function useExercises() {
+  return useQuery({ queryKey: ['workouts', 'exercises'], queryFn: () => api<Exercise[]>('/workouts/exercises/') })
+}
+
+/** Adding a name you already have returns the existing exercise (case-insensitive). */
+export function useCreateExercise() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) => api<Exercise>('/workouts/exercises/', { method: 'POST', json: { name } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workouts', 'exercises'] }),
+  })
+}
+
+const workoutBusy = (w: Workout) => w.exercises.some((e) => e.sets.some((s) => s.video && isProcessing(s.video)))
+
+/** Newest first, cursor-paginated. */
+export function useWorkouts() {
+  return useInfiniteQuery({
+    queryKey: ['workouts', 'list'],
+    queryFn: ({ pageParam }) => api<Page<Workout>>(`/workouts/?${pageParam ?? ''}`),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => cursorQuery(last.next),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.pages.some((p) => p.results.some(workoutBusy))),
+  })
+}
+
+export function useWorkout(id: string | undefined) {
+  return useQuery({
+    queryKey: ['workout', id],
+    queryFn: () => api<Workout>(`/workouts/${id}/`),
+    enabled: !!id,
+    refetchInterval: (q) => pollWhile(!!q.state.data && workoutBusy(q.state.data)),
+  })
+}
+
+export function useSaveWorkout() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: WorkoutInput }) =>
+      id ? api<Workout>(`/workouts/${id}/`, { method: 'PUT', json: data }) : api<Workout>('/workouts/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeleteWorkout() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate({ passive: ['workout'] }),
+  })
+}
+
+export function useProgressReports() {
+  return useQuery({
+    queryKey: ['workouts', 'progress'],
+    queryFn: () => api<ProgressReport[]>('/workouts/progress/'),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.photos.some(isProcessing))),
+  })
+}
+
+export function useSaveProgressReport() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: ProgressReportInput }) =>
+      id
+        ? api<ProgressReport>(`/workouts/progress/${id}/`, { method: 'PATCH', json: data })
+        : api<ProgressReport>('/workouts/progress/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeleteProgressReport() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/progress/${id}/`, { method: 'DELETE' }),
     onSuccess: () => invalidate(),
   })
 }

@@ -23,5 +23,7 @@ export const markerKey = (m: GoalMarker) => `${m.kind}:${m.milestone?.id ?? m.go
 export function ownerLink(asset: MediaAsset): { to: string; label: string } {
   const o = asset.owner
   if (o.kind === 'entry') return { to: `/entries/${o.id}`, label: 'View entry' }
+  if (o.kind === 'workout_set') return { to: `/workouts/${o.workout_id}`, label: 'View workout' }
+  if (o.kind === 'progress_report') return { to: '/workouts/progress', label: 'View progress' }
   return { to: `/goals/${o.goal_id}`, label: 'View goal' }
 }
