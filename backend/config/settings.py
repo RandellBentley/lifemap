@@ -151,7 +151,7 @@ COGNITO_DOMAIN = env("COGNITO_DOMAIN", "").rstrip("/")  # https://<prefix>.auth.
 # --- Media storage ---------------------------------------------------------------
 AWS_REGION = env("AWS_REGION", "us-east-1")
 MEDIA_BUCKET = env("MEDIA_BUCKET", "lifemap-media-local")
-# Local MinIO: the server talks to http://minio:9000, but presigned URLs must use a
+# Local S3 emulator: the server talks to e.g. http://s3:8333, but presigned URLs must use a
 # host the browser can reach, so they are signed against the public endpoint.
 AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL") or None
 AWS_S3_PUBLIC_ENDPOINT_URL = env("AWS_S3_PUBLIC_ENDPOINT_URL") or AWS_S3_ENDPOINT_URL
@@ -174,6 +174,14 @@ if not CLOUDFRONT_PRIVATE_KEY and env("CLOUDFRONT_PRIVATE_KEY_FILE"):
 MEDIA_PROCESSING_ENABLED = env_bool("MEDIA_PROCESSING_ENABLED", False)
 # Shared secret the media-processing Lambda uses to report results.
 INTERNAL_API_TOKEN = env("INTERNAL_API_TOKEN", "")
+
+# --- Feature flags ------------------------------------------------------------------
+# Per-environment switches, e.g. FEATURES=workouts on the personal site and nothing on the
+# public demo. Same code everywhere; only configuration differs. See config/features.py.
+KNOWN_FEATURES = {"workouts"}
+FEATURES = frozenset(env_list("FEATURES", ""))
+if unknown := FEATURES - KNOWN_FEATURES:
+    raise RuntimeError(f"Unknown FEATURES {sorted(unknown)}; known: {sorted(KNOWN_FEATURES)}")
 
 LOGGING = {
     "version": 1,

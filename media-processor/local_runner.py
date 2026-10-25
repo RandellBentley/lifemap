@@ -16,7 +16,7 @@ s3 = boto3.client("s3")
 
 
 def ensure_secret():
-    # The handler reads its callback token from Secrets Manager, which Moto also emulates.
+    # The handler reads its callback token from Secrets Manager, emulated by Moto locally.
     sm = boto3.client("secretsmanager")
     try:
         sm.create_secret(

@@ -28,6 +28,11 @@ variable "memory" {
   type    = number
   default = 1024
 }
+variable "features" {
+  description = "Feature flags to switch on (FEATURES env var), e.g. [\"workouts\"]. Empty = none."
+  type        = list(string)
+  default     = []
+}
 variable "desired_count" {
   type    = number
   default = 1
@@ -370,6 +375,7 @@ locals {
     CLOUDFRONT_MEDIA_BASE_URL   = local.app_url
     CLOUDFRONT_KEY_PAIR_ID      = var.cloudfront_key_pair_id
     MEDIA_PROCESSING_ENABLED    = "1"
+    FEATURES                    = join(",", var.features)
   }
 
   secrets = {
