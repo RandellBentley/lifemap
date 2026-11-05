@@ -99,7 +99,11 @@ scripts/local-prod.sh superuser   # create a login
 scripts/local-prod.sh logs web    # follow logs (any service)
 scripts/local-prod.sh down        # stop; data is kept in infra/local/.data
 scripts/local-prod.sh reset       # stop and delete local data
+scripts/local-prod.sh backup <dir>          # copy the database and media to <dir>
+scripts/local-prod.sh restore <dir> [dump]  # replace local data with a backup
 ```
+
+**Backups.** Local data lives on one machine, so back it up to another disk, such as an external drive. `backup` must point outside the repository. It keeps the last 30 database dumps in `<dir>/db` and adds new files to `<dir>/media`. Files deleted in the app stay in the backup so older dumps still work.
 
 This runs **the same `infra/host/docker-compose.yml` that runs on EC2**: the Caddy origin with the secret-header check, gunicorn, `DEBUG=0`, Postgres, and the same migrate-then-start order. `infra/local/` adds local stand-ins for the AWS services around the host:
 
