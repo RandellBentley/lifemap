@@ -84,13 +84,21 @@ class WorkoutSet(models.Model):
         return f"{self.reps} reps @ {self.weight_kg} kg{'' if self.made else ' (missed)'}"
 
 
+REP_TARGETS = (1, 2, 3, 5)  # the rep counts PRs are tracked for
+REP_CHOICES = [(n, f"{n} rep{'s' if n > 1 else ''}") for n in REP_TARGETS]
+
+
 class PersonalRecord(models.Model):
-    """A PR you log yourself: a lift from the exercise library, the weight, the date, an optional video."""
+    """
+    A PR you log yourself: a lift from the exercise library, a rep target, the weight, the date and an
+    optional video. PRs set in workouts are detected on the fly instead (see records.py).
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="personal_records")
     # RESTRICT, like workouts: a lift with PRs can be renamed but not deleted.
     exercise = models.ForeignKey(Exercise, on_delete=models.RESTRICT, related_name="records")
+    reps = models.PositiveSmallIntegerField(choices=REP_CHOICES, default=1)
     weight_kg = models.DecimalField(**WEIGHT)
     achieved_on = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -100,7 +108,7 @@ class PersonalRecord(models.Model):
         ordering = ["-achieved_on", "-created_at"]
 
     def __str__(self):
-        return f"{self.exercise.name} PR: {self.weight_kg} kg on {self.achieved_on}"
+        return f"{self.exercise.name} {self.reps}-rep PR: {self.weight_kg} kg on {self.achieved_on}"
 
 
 class ProgressReport(models.Model):

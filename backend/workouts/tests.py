@@ -270,10 +270,43 @@ class WorkoutApiTests(TestCase):
         self.assertFalse(MediaAsset.objects.exists())
         self.assertEqual(len(delete_objects.call_args.args[0]), 1)
 
+    def test_prs_are_detected_from_workouts(self, *_):
+        def log(day, *sets):
+            self.create_workout(performed_on=day, exercises=[{"exercise": self.snatch["id"], "sets": [
+                {"reps": r, "weight_kg": w, "made": made} for r, w, made in sets]}])
+
+        log("2026-09-01", (3, 60, True))         # first time: PRs for 1, 2 and 3 reps
+        log("2026-09-15", (5, 62, True))         # beats 1-3 and sets the first 5
+        log("2026-09-20", (1, 61, True))         # below the 62 already done for 5
+        log("2026-09-25", (1, 70, False))        # missed lifts don't count
+        log("2026-10-01", (2, 65, True), (2, 65, True))  # only the first of two equal sets
+        self.client.post("/api/workouts/records/", {"exercise": self.snatch["id"], "reps": 1, "weight_kg": 80,
+                                                     "achieved_on": "2026-10-05"}, format="json")
+        log("2026-10-10", (1, 75, True))         # below the logged 80
+
+        rows = self.client.get("/api/workouts/records/").json()
+        self.assertEqual([(r["achieved_on"], r["reps"], r["weight_kg"], r["source"], r["set_reps"]) for r in rows], [
+            ("2026-10-05", 1, 80, "logged", 1),
+            ("2026-10-01", 2, 65, "workout", 2), ("2026-10-01", 1, 65, "workout", 2),
+            ("2026-09-15", 5, 62, "workout", 5), ("2026-09-15", 3, 62, "workout", 5),
+            ("2026-09-15", 2, 62, "workout", 5), ("2026-09-15", 1, 62, "workout", 5),
+            ("2026-09-01", 3, 60, "workout", 3), ("2026-09-01", 2, 60, "workout", 3),
+            ("2026-09-01", 1, 60, "workout", 3),
+        ])
+        self.assertTrue(all(r["workout_id"] for r in rows if r["source"] == "workout"))
+
+        # Derived, not stored: deleting the workout takes its PRs with it.
+        self.client.delete(f"/api/workouts/{rows[1]['workout_id']}/")
+        rows = self.client.get("/api/workouts/records/").json()
+        self.assertNotIn("2026-10-01", [r["achieved_on"] for r in rows])
+
     def test_personal_record_validation(self, *_):
         url = "/api/workouts/records/"
         missing = self.client.post(url, {"exercise": self.snatch["id"]}, format="json")
         self.assertEqual(set(missing.data), {"weight_kg", "achieved_on"})
+        four = self.client.post(url, {"exercise": self.snatch["id"], "reps": 4, "weight_kg": 80,
+                                      "achieved_on": "2026-09-01"}, format="json")
+        self.assertIn("reps", four.data)  # PRs are for 1, 2, 3 or 5 reps
         other = Exercise.objects.create(user=User.objects.create_user("bob"), name="Snatch")
         stolen = self.client.post(url, {"exercise": str(other.id), "weight_kg": 80, "achieved_on": "2026-09-01"},
                                   format="json")

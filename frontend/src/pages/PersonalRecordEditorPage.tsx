@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { errorMessage } from '../api/client'
 import { removeSingleMedia, useCreateExercise, useInvalidateJournal, usePersonalRecords, useSavePersonalRecord } from '../api/hooks'
+import { REP_TARGETS, type RepTarget } from '../api/types'
 import { ExerciseSelect } from '../components/ExerciseSelect'
 import { VideoField, type VideoDraft } from '../components/VideoField'
 import { WeightInput } from '../components/WeightInput'
@@ -9,19 +10,20 @@ import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { dayKey } from '../lib/dates'
 import { uploadSingle } from '../lib/upload'
 
-/** New or edit PR: a lift from the exercise library, weight, date, optional video. ?lift=<id> preselects the lift. */
+/** New or edit a logged PR: lift, rep target, weight, date, optional video. ?lift=<id>&reps=<n> preselect. */
 export function PersonalRecordEditorPage() {
   const { id } = useParams()
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const { data: records = [] } = usePersonalRecords()
-  const existing = records.find((r) => r.id === id)
+  const existing = records.find((r) => r.source === 'logged' && r.source_id === id)
   const save = useSavePersonalRecord()
   const createExercise = useCreateExercise()
   const invalidate = useInvalidateJournal()
 
   const [exerciseId, setExerciseId] = useState(params.get('lift') ?? '')
   const [newExerciseName, setNewExerciseName] = useState<string>()
+  const [reps, setReps] = useState<RepTarget>(() => REP_TARGETS.find((n) => String(n) === params.get('reps')) ?? 1)
   const [weightKg, setWeightKg] = useState<number | null>(null)
   const [achievedOn, setAchievedOn] = useState(() => dayKey(new Date()))
   const [video, setVideo] = useState<VideoDraft>({ video: null, newVideo: null, removeVideo: false })
@@ -34,6 +36,7 @@ export function PersonalRecordEditorPage() {
   useEffect(() => {
     if (!existing || loaded) return
     setExerciseId(existing.exercise)
+    setReps(existing.reps)
     setWeightKg(existing.weight_kg)
     setAchievedOn(existing.achieved_on)
     setVideo({ video: existing.video, newVideo: null, removeVideo: false })
@@ -56,7 +59,7 @@ export function PersonalRecordEditorPage() {
       if (weightKg === null) return setError('Enter the weight.')
 
       setStatus('Saving…')
-      const record = await save.mutateAsync({ id: savedId, data: { exercise, weight_kg: weightKg, achieved_on: achievedOn } })
+      const record = await save.mutateAsync({ id: savedId, data: { exercise, reps, weight_kg: weightKg, achieved_on: achievedOn } })
       setSavedId(record.id)
       const path = `/workouts/records/${record.id}/video/`
       if (video.newVideo) {
@@ -90,6 +93,16 @@ export function PersonalRecordEditorPage() {
       </div>
 
       <div className="field-row">
+        <label className="field">
+          <span>Reps</span>
+          <select value={reps} onChange={(e) => setReps(Number(e.target.value) as RepTarget)}>
+            {REP_TARGETS.map((n) => (
+              <option key={n} value={n}>
+                {n} {n === 1 ? 'rep' : 'reps'}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="field">
           <span>Weight</span>
           <WeightInput valueKg={weightKg} onChange={setWeightKg} />

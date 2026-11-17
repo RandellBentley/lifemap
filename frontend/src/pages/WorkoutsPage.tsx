@@ -29,7 +29,7 @@ export function WorkoutsPage() {
             </Link>
           ) : prs ? (
             <Link to="/workouts/prs/new" className="btn primary">
-              + New PR
+              + Log PR
             </Link>
           ) : (
             <Link to="/workouts/new" className="btn primary">

@@ -198,7 +198,9 @@ class PersonalRecordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PersonalRecord
-        fields = ["id", "exercise", "exercise_name", "weight_kg", "achieved_on", "video", "created_at", "updated_at"]
+        fields = [
+            "id", "exercise", "exercise_name", "reps", "weight_kg", "achieved_on", "video", "created_at", "updated_at",
+        ]
         read_only_fields = ["created_at", "updated_at"]
 
     def get_video(self, record):

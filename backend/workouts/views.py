@@ -17,6 +17,7 @@ from journal.serializers import UploadRequestSerializer
 from journal.uploads import delete_media, issue_upload, replace_single_media
 
 from .models import Exercise, PersonalRecord, ProgressReport, Workout, WorkoutExercise, WorkoutSet
+from .records import pr_rows
 from .serializers import ExerciseSerializer, PersonalRecordSerializer, ProgressReportSerializer, WorkoutSerializer
 
 PERMISSIONS = [requires_feature("workouts"), IsAuthenticated]
@@ -132,8 +133,9 @@ class SetViewSet(viewsets.GenericViewSet):
 
 class PersonalRecordViewSet(viewsets.ModelViewSet):
     """
-    GET/POST /api/workouts/records/ (newest first); GET/PUT/PATCH/DELETE /api/workouts/records/{id}/;
-    POST|DELETE /api/workouts/records/{id}/video/ attaches (upload ticket) or removes its video.
+    GET /api/workouts/records/   the PR board: logged PRs plus PRs detected from workouts, newest first.
+    POST/PUT/PATCH/DELETE /api/workouts/records/[{id}/] log and edit your own PRs;
+    POST|DELETE /api/workouts/records/{id}/video/ attaches (upload ticket) or removes a logged PR's video.
     """
 
     serializer_class = PersonalRecordSerializer
@@ -147,6 +149,9 @@ class PersonalRecordViewSet(viewsets.ModelViewSet):
             .select_related("exercise")
             .prefetch_related(Prefetch("media", queryset=MEDIA))
         )
+
+    def list(self, request, *args, **kwargs):
+        return Response(pr_rows(request.user, MEDIA, self.get_serializer_context()))
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

@@ -296,11 +296,15 @@ export interface LiftPoint {
   reps: number
 }
 
+export const REP_TARGETS = [1, 2, 3, 5] as const
+export type RepTarget = (typeof REP_TARGETS)[number]
+
 /** A PR you log yourself; `exercise` is from the same library as workouts. */
 export interface PersonalRecord {
   id: string
   exercise: string
   exercise_name: string
+  reps: RepTarget
   weight_kg: number
   achieved_on: string
   video: MediaAsset | null
@@ -310,8 +314,27 @@ export interface PersonalRecord {
 
 export interface PersonalRecordInput {
   exercise: string
+  reps: RepTarget
   weight_kg: number
   achieved_on: string
+}
+
+/**
+ * One line of the PR board: a logged PR, or a workout set that beat the best so far, for one
+ * rep target. A set counts toward every target up to its reps, so one set can give several rows.
+ */
+export interface PRRow {
+  key: string
+  source: 'logged' | 'workout'
+  source_id: string // the PersonalRecord or WorkoutSet id
+  workout_id: string | null
+  exercise: string
+  exercise_name: string
+  reps: RepTarget
+  set_reps: number // e.g. a 3-rep PR from a set of 5
+  weight_kg: number
+  achieved_on: string
+  video: MediaAsset | null
 }
 
 /** A workout's optional physique update (stored as a progress report dated the workout's day). */

@@ -1042,7 +1042,14 @@ img, video { max-width: 100%; display: block; }
 
 /* Workouts → PRs */
 .pr-card { display: flex; flex-direction: column; gap: 0.5rem; }
-.pr-best { margin: 0; }
-.pr-best strong { font-size: 1.4rem; }
-.pr-best-row td:nth-child(2) { font-weight: 700; }
+.pr-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+.pr-tile { display: flex; flex-direction: column; gap: 0.1rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; }
+.pr-tile strong { font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.pr-tile-empty { text-decoration: none; font-size: 1.15rem; }
 .pr-actions { text-align: right; white-space: nowrap; }
+.pr-badge { margin-left: 0.4rem; padding: 0.05rem 0.45rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+@media (max-width: 560px) {
+  .sets-table.pr-table th:nth-child(5), .sets-table.pr-table td:nth-child(5) { display: table-cell; } /* actions */
+  .pr-tile { padding: 0.45rem 0.5rem; }
+  .pr-tile strong { font-size: 0.95rem; }
+}

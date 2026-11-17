@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { useDeleteWorkout, useWorkout } from '../api/hooks'
+import { useDeleteWorkout, usePersonalRecords, useWorkout } from '../api/hooks'
 import type { MediaAsset } from '../api/types'
 import { Lightbox } from '../components/Lightbox'
 import { MediaGrid, MediaThumb } from '../components/MediaGrid'
+import { repTargetsLabel } from '../components/PersonalRecords'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, useWeightUnit } from '../lib/weight'
@@ -15,6 +16,13 @@ export function WorkoutPage() {
   const remove = useDeleteWorkout()
   const [unit] = useWeightUnit()
   const [confirming, setConfirming] = useState(false)
+  // Sets in this workout that were PRs when lifted: set id -> rep targets.
+  const { data: records } = usePersonalRecords()
+  const prTargets = useMemo(() => {
+    const map = new Map<string, number[]>()
+    for (const r of records ?? []) if (r.workout_id === id) map.set(r.source_id, [...(map.get(r.source_id) ?? []), r.reps])
+    return map
+  }, [records, id])
 
   // Set videos, then physique photos: one lightbox steps through all of them.
   const media = useMemo(() => {
@@ -94,7 +102,10 @@ export function WorkoutPage() {
                   <td className="set-number">{i + 1}</td>
                   <td>{s.reps}</td>
                   <td>{formatWeight(s.weight_kg, unit)}</td>
-                  <td className={s.made ? 'set-result made' : 'set-result missed'}>{s.made ? 'Made' : 'Missed'}</td>
+                  <td className={s.made ? 'set-result made' : 'set-result missed'}>
+                    {s.made ? 'Made' : 'Missed'}
+                    {prTargets.has(s.id) && <span className="pr-badge">🏆 PR · {repTargetsLabel(prTargets.get(s.id)!)}</span>}
+                  </td>
                   <td>
                     {s.video && (
                       <button className="set-video-thumb clickable" onClick={() => setOpenId(s.video!.id)} aria-label={`Play set ${i + 1} video`}>

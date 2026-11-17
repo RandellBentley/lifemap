@@ -20,6 +20,7 @@ import type {
   MetricInput,
   Milestone,
   MilestoneInput,
+  PRRow,
   Page,
   PersonalRecord,
   PersonalRecordInput,
@@ -532,11 +533,11 @@ export function useProgressReports() {
   })
 }
 
-/** PRs, newest first. Polls while a video is processing. */
+/** The PR board (logged + detected from workouts), newest first. Polls while a video is processing. */
 export function usePersonalRecords() {
   return useQuery({
     queryKey: ['workouts', 'records'],
-    queryFn: () => api<PersonalRecord[]>('/workouts/records/'),
+    queryFn: () => api<PRRow[]>('/workouts/records/'),
     refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.video && isProcessing(r.video))),
   })
 }
