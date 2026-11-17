@@ -5,16 +5,18 @@ import type { MediaAsset, ProgressReport, Workout } from '../api/types'
 import { Lightbox } from '../components/Lightbox'
 import { LiftProgress } from '../components/LiftProgress'
 import { MediaGrid } from '../components/MediaGrid'
+import { PersonalRecords } from '../components/PersonalRecords'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, fromKg, useWeightUnit } from '../lib/weight'
 
-/** /workouts (sessions), /workouts/progress (lift charts) and /workouts/physique (physique
- * updates), with a shared kg/lb toggle. */
+/** /workouts (sessions), /workouts/progress (lift charts), /workouts/prs (personal records) and
+ * /workouts/physique (physique updates), with a shared kg/lb toggle. */
 export function WorkoutsPage() {
   const { pathname } = useLocation()
   const physique = pathname.endsWith('/physique')
   const progress = pathname.endsWith('/progress')
+  const prs = pathname.endsWith('/prs')
   return (
     <div className="page">
       <div className="page-header">
@@ -24,6 +26,10 @@ export function WorkoutsPage() {
           {physique ? (
             <Link to="/workouts/physique/new" className="btn primary">
               + Physique update
+            </Link>
+          ) : prs ? (
+            <Link to="/workouts/prs/new" className="btn primary">
+              + New PR
             </Link>
           ) : (
             <Link to="/workouts/new" className="btn primary">
@@ -37,9 +43,10 @@ export function WorkoutsPage() {
           Workouts
         </NavLink>
         <NavLink to="/workouts/progress">Progress</NavLink>
+        <NavLink to="/workouts/prs">PRs</NavLink>
         <NavLink to="/workouts/physique">Physique</NavLink>
       </nav>
-      {physique ? <PhysiqueList /> : progress ? <LiftProgress /> : <WorkoutList />}
+      {physique ? <PhysiqueList /> : progress ? <LiftProgress /> : prs ? <PersonalRecords /> : <WorkoutList />}
     </div>
   )
 }

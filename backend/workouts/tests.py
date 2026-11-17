@@ -8,7 +8,7 @@ from rest_framework.test import APIClient
 from accounts.models import User
 from journal.models import MediaAsset
 
-from .models import Exercise, ProgressReport, Workout, WorkoutSet
+from .models import Exercise, PersonalRecord, ProgressReport, Workout, WorkoutSet
 
 VIDEO = {"filename": "set1.mov", "content_type": "video/quicktime", "size": 1000}
 PHOTO = {"filename": "front.jpg", "content_type": "image/jpeg", "size": 1000}
@@ -236,7 +236,49 @@ class WorkoutApiTests(TestCase):
         report = ProgressReport.objects.create(user=self.user, recorded_on=dt.date(2026, 10, 1))
         ticket = self.client.post(f"/api/workouts/progress/{report.id}/photos/", PHOTO, format="json")
         self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        record = self.client.post("/api/workouts/records/", {"exercise": self.snatch["id"], "weight_kg": 80,
+                                                              "achieved_on": "2026-10-02"}, format="json").data
+        ticket = self.client.post(f"/api/workouts/records/{record['id']}/video/", VIDEO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
         self.assertEqual(self.client.get("/api/media/").data["results"], [])
+
+    # --- PRs ----------------------------------------------------------------------------
+
+    def test_personal_records(self, delete_objects, *_):
+        url = "/api/workouts/records/"
+        first = self.client.post(url, {"exercise": self.snatch["id"], "weight_kg": 80, "achieved_on": "2026-09-01"},
+                                 format="json")
+        self.assertEqual(first.status_code, 201, first.data)
+        self.client.post(url, {"exercise": self.snatch["id"], "weight_kg": 85, "achieved_on": "2026-10-01"},
+                         format="json")
+        listed = self.client.get(url).json()
+        self.assertEqual([(r["exercise_name"], r["weight_kg"], r["achieved_on"]) for r in listed],
+                         [("Snatch", 85, "2026-10-01"), ("Snatch", 80, "2026-09-01")])  # newest first
+
+        record = first.data["id"]
+        self.assertEqual(self.client.post(f"{url}{record}/video/", PHOTO, format="json").status_code, 400)
+        ticket = self.client.post(f"{url}{record}/video/", VIDEO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        video = self.client.get(f"{url}{record}/").json()["video"]
+        self.assertEqual(video["owner"], {"kind": "personal_record", "id": record, "title": "Snatch",
+                                          "date": "2026-09-01"})
+
+        # A lift with PRs can't be deleted (rename it instead); deleting the PR removes its video.
+        self.assertEqual(self.client.delete(f"/api/workouts/exercises/{self.snatch['id']}/").status_code, 409)
+        delete_objects.reset_mock()
+        self.client.delete(f"{url}{record}/")
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertEqual(len(delete_objects.call_args.args[0]), 1)
+
+    def test_personal_record_validation(self, *_):
+        url = "/api/workouts/records/"
+        missing = self.client.post(url, {"exercise": self.snatch["id"]}, format="json")
+        self.assertEqual(set(missing.data), {"weight_kg", "achieved_on"})
+        other = Exercise.objects.create(user=User.objects.create_user("bob"), name="Snatch")
+        stolen = self.client.post(url, {"exercise": str(other.id), "weight_kg": 80, "achieved_on": "2026-09-01"},
+                                  format="json")
+        self.assertIn("exercise", stolen.data)
+        self.assertFalse(PersonalRecord.objects.exists())
 
     # --- isolation ----------------------------------------------------------------------
 
@@ -255,7 +297,7 @@ class WorkoutApiTests(TestCase):
 class WorkoutFeatureFlagTests(TestCase):
     """With the flag off (the public demo), every workouts endpoint is a 404."""
 
-    ENDPOINTS = ["/api/workouts/", "/api/workouts/exercises/", "/api/workouts/progress/",
+    ENDPOINTS = ["/api/workouts/", "/api/workouts/exercises/", "/api/workouts/progress/", "/api/workouts/records/",
                  "/api/workouts/00000000-0000-0000-0000-000000000000/",
                  "/api/workouts/sets/00000000-0000-0000-0000-000000000000/video/"]
 

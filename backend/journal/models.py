@@ -98,7 +98,7 @@ class Entry(models.Model):
         super().save(*args, **kwargs)
 
 
-MEDIA_OWNER_FIELDS = ("entry", "goal", "milestone", "workout_set", "progress_report")
+MEDIA_OWNER_FIELDS = ("entry", "goal", "milestone", "workout_set", "progress_report", "personal_record")
 
 
 def _exactly_one_owner():
@@ -135,6 +135,9 @@ class MediaAsset(models.Model):
     progress_report = models.ForeignKey(
         "workouts.ProgressReport", null=True, blank=True, on_delete=models.CASCADE, related_name="photos"
     )
+    personal_record = models.ForeignKey(
+        "workouts.PersonalRecord", null=True, blank=True, on_delete=models.CASCADE, related_name="media"
+    )
     kind = models.CharField(max_length=10, choices=Kind.choices)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
     content_type = models.CharField(max_length=100)
@@ -154,7 +157,7 @@ class MediaAsset(models.Model):
     class Meta:
         ordering = ["position", "created_at"]
         constraints = [
-            models.CheckConstraint(condition=_exactly_one_owner(), name="media_has_exactly_one_owner_v2"),
+            models.CheckConstraint(condition=_exactly_one_owner(), name="media_has_exactly_one_owner_v3"),
         ]
 
     def __str__(self):

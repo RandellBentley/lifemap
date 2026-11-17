@@ -84,6 +84,25 @@ class WorkoutSet(models.Model):
         return f"{self.reps} reps @ {self.weight_kg} kg{'' if self.made else ' (missed)'}"
 
 
+class PersonalRecord(models.Model):
+    """A PR you log yourself: a lift from the exercise library, the weight, the date, an optional video."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="personal_records")
+    # RESTRICT, like workouts: a lift with PRs can be renamed but not deleted.
+    exercise = models.ForeignKey(Exercise, on_delete=models.RESTRICT, related_name="records")
+    weight_kg = models.DecimalField(**WEIGHT)
+    achieved_on = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-achieved_on", "-created_at"]
+
+    def __str__(self):
+        return f"{self.exercise.name} PR: {self.weight_kg} kg on {self.achieved_on}"
+
+
 class ProgressReport(models.Model):
     """
     A physique update: date, body weight, notes, photos (MediaAsset with progress_report=this).

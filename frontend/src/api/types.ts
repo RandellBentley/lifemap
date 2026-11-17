@@ -32,6 +32,7 @@ export type MediaOwner =
   | { kind: 'milestone'; id: string; title: string; goal_id: string; goal_title: string; date: string | null }
   | { kind: 'workout_set'; id: string; workout_id: string; title: string; date: string }
   | { kind: 'progress_report'; id: string; date: string }
+  | { kind: 'personal_record'; id: string; title: string; date: string }
 
 export interface MediaAsset {
   id: string
@@ -293,6 +294,24 @@ export interface LiftPoint {
   date: string
   weight_kg: number
   reps: number
+}
+
+/** A PR you log yourself; `exercise` is from the same library as workouts. */
+export interface PersonalRecord {
+  id: string
+  exercise: string
+  exercise_name: string
+  weight_kg: number
+  achieved_on: string
+  video: MediaAsset | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PersonalRecordInput {
+  exercise: string
+  weight_kg: number
+  achieved_on: string
 }
 
 /** A workout's optional physique update (stored as a progress report dated the workout's day). */

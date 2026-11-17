@@ -21,6 +21,8 @@ import type {
   Milestone,
   MilestoneInput,
   Page,
+  PersonalRecord,
+  PersonalRecordInput,
   ProgressReport,
   ProgressReportInput,
   Tag,
@@ -527,6 +529,32 @@ export function useProgressReports() {
     queryKey: ['workouts', 'progress'],
     queryFn: () => api<ProgressReport[]>('/workouts/progress/'),
     refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.photos.some(isProcessing))),
+  })
+}
+
+/** PRs, newest first. Polls while a video is processing. */
+export function usePersonalRecords() {
+  return useQuery({
+    queryKey: ['workouts', 'records'],
+    queryFn: () => api<PersonalRecord[]>('/workouts/records/'),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.video && isProcessing(r.video))),
+  })
+}
+
+export function useSavePersonalRecord() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: PersonalRecordInput }) =>
+      id
+        ? api<PersonalRecord>(`/workouts/records/${id}/`, { method: 'PATCH', json: data })
+        : api<PersonalRecord>('/workouts/records/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeletePersonalRecord() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/records/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate(),
   })
 }
 

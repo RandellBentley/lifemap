@@ -37,6 +37,9 @@ export default function App() {
           <Route path="/events/:id/edit" element={<EventEditorPage />} />
           <Route path="/workouts" element={<Workouts page={<WorkoutsPage />} />} />
           <Route path="/workouts/progress" element={<Workouts page={<WorkoutsPage />} />} />
+          <Route path="/workouts/prs" element={<Workouts page={<WorkoutsPage />} />} />
+          <Route path="/workouts/prs/new" element={<Workouts page={<PersonalRecordEditorPage />} />} />
+          <Route path="/workouts/prs/:id/edit" element={<Workouts page={<PersonalRecordEditorPage />} />} />
           <Route path="/workouts/physique" element={<Workouts page={<WorkoutsPage />} />} />
           <Route path="/workouts/physique/new" element={<Workouts page={<ProgressEditorPage />} />} />
           <Route path="/workouts/physique/:id/edit" element={<Workouts page={<ProgressEditorPage />} />} />
@@ -54,6 +57,9 @@ export default function App() {
 const WorkoutsPage = lazy(() => import('./pages/WorkoutsPage').then((m) => ({ default: m.WorkoutsPage })))
 const WorkoutPage = lazy(() => import('./pages/WorkoutPage').then((m) => ({ default: m.WorkoutPage })))
 const WorkoutEditorPage = lazy(() => import('./pages/WorkoutEditorPage').then((m) => ({ default: m.WorkoutEditorPage })))
+const PersonalRecordEditorPage = lazy(() =>
+  import('./pages/PersonalRecordEditorPage').then((m) => ({ default: m.PersonalRecordEditorPage })),
+)
 const ProgressEditorPage = lazy(() => import('./pages/ProgressEditorPage').then((m) => ({ default: m.ProgressEditorPage })))
 
 const NotFound = () => <p className="muted">Page not found.</p>

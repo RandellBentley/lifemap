@@ -5,7 +5,7 @@ from journal.models import MediaAsset
 from journal.serializers import MediaAssetSerializer
 from journal.uploads import delete_media
 
-from .models import WEIGHT, Exercise, ProgressReport, Workout, WorkoutExercise, WorkoutSet
+from .models import WEIGHT, Exercise, PersonalRecord, ProgressReport, Workout, WorkoutExercise, WorkoutSet
 
 UNCHANGED = object()  # a nested field left out of a write, as opposed to null
 
@@ -188,6 +188,22 @@ class WorkoutSerializer(serializers.ModelSerializer):
         if obj_id not in existing:
             raise serializers.ValidationError({"exercises": [f"Unknown {label} id {obj_id} for this workout."]})
         return existing[obj_id]
+
+
+class PersonalRecordSerializer(serializers.ModelSerializer):
+    exercise = UserExerciseField()
+    exercise_name = serializers.CharField(source="exercise.name", read_only=True)
+    weight_kg = serializers.DecimalField(**WEIGHT, min_value=0, coerce_to_string=False)
+    video = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PersonalRecord
+        fields = ["id", "exercise", "exercise_name", "weight_kg", "achieved_on", "video", "created_at", "updated_at"]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_video(self, record):
+        asset = next(iter(record.media.all()), None)
+        return MediaAssetSerializer(asset, context=self.context).data if asset else None
 
 
 class ProgressReportSerializer(serializers.ModelSerializer):

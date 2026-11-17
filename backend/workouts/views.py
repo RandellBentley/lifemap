@@ -16,8 +16,8 @@ from journal.models import MediaAsset
 from journal.serializers import UploadRequestSerializer
 from journal.uploads import delete_media, issue_upload, replace_single_media
 
-from .models import Exercise, ProgressReport, Workout, WorkoutExercise, WorkoutSet
-from .serializers import ExerciseSerializer, ProgressReportSerializer, WorkoutSerializer
+from .models import Exercise, PersonalRecord, ProgressReport, Workout, WorkoutExercise, WorkoutSet
+from .serializers import ExerciseSerializer, PersonalRecordSerializer, ProgressReportSerializer, WorkoutSerializer
 
 PERMISSIONS = [requires_feature("workouts"), IsAuthenticated]
 UUID = r"[0-9a-f-]{36}"
@@ -31,7 +31,7 @@ class ExerciseViewSet(viewsets.ModelViewSet):
     """
     GET/POST /api/workouts/exercises/   the exercise library behind the dropdown.
     POSTing a name you already have (any capitalization) returns the existing exercise.
-    DELETE refuses (409) once an exercise is used in a workout; rename it instead.
+    DELETE refuses (409) once an exercise is used in a workout or a PR; rename it instead.
     GET /api/workouts/exercises/{id}/history/   one point per workout, for the progress chart.
     """
 
@@ -59,9 +59,9 @@ class ExerciseViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         exercise = self.get_object()
-        if exercise.uses.exists():
+        if exercise.uses.exists() or exercise.records.exists():
             return Response(
-                {"detail": "This exercise is used in past workouts. Rename it instead of deleting it."},
+                {"detail": "This exercise is used in past workouts or PRs. Rename it instead of deleting it."},
                 status=status.HTTP_409_CONFLICT,
             )
         exercise.delete()
@@ -128,6 +128,37 @@ class SetViewSet(viewsets.GenericViewSet):
     def video(self, request, pk=None):
         workout_set = self.get_object()
         return replace_single_media(request, "workout_set", workout_set, workout_set.media.all(), kinds=("video",))
+
+
+class PersonalRecordViewSet(viewsets.ModelViewSet):
+    """
+    GET/POST /api/workouts/records/ (newest first); GET/PUT/PATCH/DELETE /api/workouts/records/{id}/;
+    POST|DELETE /api/workouts/records/{id}/video/ attaches (upload ticket) or removes its video.
+    """
+
+    serializer_class = PersonalRecordSerializer
+    permission_classes = PERMISSIONS
+    pagination_class = None
+    lookup_value_regex = UUID
+
+    def get_queryset(self):
+        return (
+            PersonalRecord.objects.filter(user=self.request.user)
+            .select_related("exercise")
+            .prefetch_related(Prefetch("media", queryset=MEDIA))
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def perform_destroy(self, record):
+        delete_media(record.media.all())
+        record.delete()
+
+    @action(detail=True, methods=["post", "delete"])
+    def video(self, request, pk=None):
+        record = self.get_object()
+        return replace_single_media(request, "personal_record", record, record.media.all(), kinds=("video",))
 
 
 class ProgressReportViewSet(viewsets.ModelViewSet):

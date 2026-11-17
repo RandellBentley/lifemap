@@ -74,6 +74,10 @@ class MediaAssetSerializer(serializers.ModelSerializer):
         if asset.progress_report_id:
             report = asset.progress_report
             return {"kind": "progress_report", "id": str(report.id), "date": report.recorded_on.isoformat()}
+        if asset.personal_record_id:
+            pr = asset.personal_record
+            return {"kind": "personal_record", "id": str(pr.id), "title": pr.exercise.name,
+                    "date": pr.achieved_on.isoformat()}
         m = asset.milestone
         return {"kind": "milestone", "id": str(m.id), "title": m.title, "goal_id": str(m.goal_id),
                 "goal_title": m.goal.title, "date": m.occurred_on.isoformat() if m.occurred_on else None}

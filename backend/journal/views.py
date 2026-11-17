@@ -320,7 +320,7 @@ class MediaAssetViewSet(
             MediaAsset.objects.filter(user=self.request.user)
             .select_related(
                 "entry", "goal", "milestone__goal", "workout_set__workout_exercise__workout",
-                "workout_set__workout_exercise__exercise", "progress_report",
+                "workout_set__workout_exercise__exercise", "progress_report", "personal_record__exercise",
             )
             .prefetch_related("tags")
             .annotate(
@@ -335,7 +335,7 @@ class MediaAssetViewSet(
         )
         if self.action == "list":
             # Workout videos and progress photos stay under Workouts (and off the public demo).
-            qs = qs.filter(workout_set__isnull=True, progress_report__isnull=True)
+            qs = qs.filter(workout_set__isnull=True, progress_report__isnull=True, personal_record__isnull=True)
             qs = qs.exclude(status__in=[MediaAsset.Status.PENDING, MediaAsset.Status.FAILED])
             params = self.request.query_params
             if tag := params.get("tag"):

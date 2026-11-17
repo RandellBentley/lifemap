@@ -8,6 +8,7 @@ router.include_root_view = False
 router.register("workouts/exercises", views.ExerciseViewSet, basename="exercise")
 router.register("workouts/sets", views.SetViewSet, basename="workout-set")
 router.register("workouts/progress", views.ProgressReportViewSet, basename="progress-report")
+router.register("workouts/records", views.PersonalRecordViewSet, basename="personal-record")
 router.register("workouts", views.WorkoutViewSet, basename="workout")
 
 urlpatterns = router.urls

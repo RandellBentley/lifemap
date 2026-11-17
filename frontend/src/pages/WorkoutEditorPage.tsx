@@ -6,20 +6,18 @@ import type { MediaAsset, Physique, Workout } from '../api/types'
 import { ExerciseSelect } from '../components/ExerciseSelect'
 import { MediaThumb } from '../components/MediaGrid'
 import { MediaPicker, type QueuedFile } from '../components/MediaPicker'
+import { VideoField, type VideoDraft } from '../components/VideoField'
 import { WeightInput } from '../components/WeightInput'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { dayKey } from '../lib/dates'
 import { uploadSingle } from '../lib/upload'
 
-interface SetDraft {
+interface SetDraft extends VideoDraft {
   key: string
   id?: string
   reps: number | null
   weightKg: number | null
   made: boolean
-  video: MediaAsset | null // already attached
-  newVideo: File | null // chosen, uploads after save
-  removeVideo: boolean
 }
 
 interface ExerciseDraft {
@@ -241,7 +239,7 @@ export function WorkoutEditorPage() {
                     <MadeToggle made={s.made} setNumber={si + 1} onChange={(made) => updateSet(ex.key, s.key, { made })} />
                   </td>
                   <td>
-                    <SetVideoField set={s} disabled={busy} onChange={(patch) => updateSet(ex.key, s.key, patch)} />
+                    <VideoField value={s} disabled={busy} onChange={(patch) => updateSet(ex.key, s.key, patch)} />
                   </td>
                   <td>
                     {ex.sets.length > 1 && (
@@ -363,39 +361,5 @@ function MadeToggle({ made, setNumber, onChange }: { made: boolean; setNumber: n
       {made ? '✓' : '✗'}
       <span className="made-label">{made ? 'Made' : 'Missed'}</span>
     </button>
-  )
-}
-
-/** Attach, replace or remove one set's video; nothing uploads until the workout is saved. */
-function SetVideoField({ set, onChange, disabled }: { set: SetDraft; onChange: (patch: Partial<SetDraft>) => void; disabled?: boolean }) {
-  const shownExisting = set.video && !set.removeVideo && !set.newVideo
-  return (
-    <span className="set-video">
-      {shownExisting && (
-        <span className="set-video-thumb">
-          <MediaThumb asset={set.video!} />
-        </span>
-      )}
-      {set.newVideo && <span className="muted small set-video-name">{set.newVideo.name}</span>}
-      <label className={`btn ghost small ${disabled ? 'disabled' : ''}`}>
-        {shownExisting || set.newVideo ? 'Replace' : '+ Video'}
-        <input
-          type="file"
-          accept="video/*"
-          hidden
-          disabled={disabled}
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) onChange({ newVideo: file, removeVideo: false })
-            e.target.value = ''
-          }}
-        />
-      </label>
-      {(shownExisting || set.newVideo) && (
-        <button type="button" className="btn ghost small" disabled={disabled} onClick={() => onChange({ newVideo: null, removeVideo: !!set.video })}>
-          Remove
-        </button>
-      )}
-    </span>
   )
 }
