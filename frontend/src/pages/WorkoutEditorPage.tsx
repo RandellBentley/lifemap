@@ -297,6 +297,7 @@ export function WorkoutEditorPage() {
             </div>
           )}
           <MediaPicker
+            photosOnly
             queue={photoQueue}
             disabled={busy}
             onAdd={(files) =>

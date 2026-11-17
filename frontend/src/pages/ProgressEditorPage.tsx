@@ -114,6 +114,7 @@ export function ProgressEditorPage() {
       <div className="field">
         <span>{existing?.photos.length ? 'Add more photos' : 'Photos'}</span>
         <MediaPicker
+          photosOnly
           queue={queue}
           disabled={saving}
           onAdd={(files) =>

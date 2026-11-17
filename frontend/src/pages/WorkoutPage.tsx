@@ -38,7 +38,7 @@ export function WorkoutPage() {
           </Link>
           <h1>{formatDay(workout.performed_on)}</h1>
           <p className="muted">
-            {workout.exercises.length} {workout.exercises.length === 1 ? 'exercise' : 'exercises'} · {totalSets} sets
+            {workout.exercises.length} {workout.exercises.length === 1 ? 'exercise' : 'exercises'} · {totalSets} {totalSets === 1 ? 'set' : 'sets'}
           </p>
         </div>
         <div className="btn-group">
