@@ -32,6 +32,7 @@ class ExerciseViewSet(viewsets.ModelViewSet):
     GET/POST /api/workouts/exercises/   the exercise library behind the dropdown.
     POSTing a name you already have (any capitalization) returns the existing exercise.
     DELETE refuses (409) once an exercise is used in a workout; rename it instead.
+    GET /api/workouts/exercises/{id}/history/   one point per workout, for the progress chart.
     """
 
     serializer_class = ExerciseSerializer
@@ -65,6 +66,23 @@ class ExerciseViewSet(viewsets.ModelViewSet):
             )
         exercise.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True)
+    def history(self, request, pk=None):
+        """The heaviest made set of each workout, oldest first. Missed and unweighted sets don't count."""
+        exercise = self.get_object()
+        workout = "workout_exercise__workout"
+        sets = (
+            WorkoutSet.objects.filter(workout_exercise__exercise=exercise, made=True, weight_kg__isnull=False)
+            .select_related(workout)
+            .order_by(f"{workout}__performed_on", f"{workout}__created_at", "-weight_kg", "-reps")
+        )
+        best = {}
+        for s in sets:  # each workout's sets come together, heaviest first
+            w = s.workout_exercise.workout
+            point = {"workout_id": w.id, "date": w.performed_on, "weight_kg": s.weight_kg, "reps": s.reps}
+            best.setdefault(w.id, point)
+        return Response(list(best.values()))
 
 
 class WorkoutPagination(CursorPagination):

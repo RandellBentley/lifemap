@@ -938,6 +938,7 @@ img, video { max-width: 100%; display: block; }
 .chart-end-label { fill: var(--text); font-size: 12px; font-weight: 600; }
 .chart-crosshair { stroke: var(--muted); stroke-width: 1; }
 .chart-hit { fill: transparent; cursor: crosshair; }
+.chart-hit.selectable { cursor: pointer; }
 .chart-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -1032,3 +1033,9 @@ img, video { max-width: 100%; display: block; }
   .sets-table td { padding-right: 0.3rem; }
   .sets-table .metric-input input { width: 4rem; }
 }
+
+/* Workouts → Progress */
+.lift-progress { display: flex; flex-direction: column; gap: 0.75rem; }
+.lift-picker { max-width: 22rem; }
+.lift-progress-note { margin: 0; }
+.lift-progress-note strong { color: var(--text); }

@@ -12,6 +12,7 @@ import type {
   GoalInput,
   GoalMarker,
   JournalEvent,
+  LiftPoint,
   Measurement,
   MeasurementInput,
   MediaAsset,
@@ -463,6 +464,15 @@ export function useDeleteMeasurement() {
 
 export function useExercises() {
   return useQuery({ queryKey: ['workouts', 'exercises'], queryFn: () => api<Exercise[]>('/workouts/exercises/') })
+}
+
+/** The heaviest made set of each workout for one lift, oldest first. */
+export function useLiftHistory(exerciseId: string | undefined) {
+  return useQuery({
+    queryKey: ['workouts', 'history', exerciseId],
+    queryFn: () => api<LiftPoint[]>(`/workouts/exercises/${exerciseId}/history/`),
+    enabled: !!exerciseId,
+  })
 }
 
 /** Adding a name you already have returns the existing exercise (case-insensitive). */

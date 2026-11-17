@@ -287,6 +287,14 @@ export interface WorkoutExercise {
   sets: WorkoutSet[]
 }
 
+/** One point on a lift's progress chart: that workout's heaviest made set. */
+export interface LiftPoint {
+  workout_id: string
+  date: string
+  weight_kg: number
+  reps: number
+}
+
 /** A workout's optional physique update (stored as a progress report dated the workout's day). */
 export interface Physique {
   id: string

@@ -80,6 +80,22 @@ class WorkoutApiTests(TestCase):
         self.user.delete()
         self.assertFalse(Exercise.objects.exists())
 
+    def test_lift_history_charts_the_heaviest_made_set_per_workout(self, *_):
+        self.create_workout(performed_on="2026-10-22", exercises=[{"exercise": self.snatch["id"], "sets": [
+            {"reps": 2, "weight_kg": 70}, {"reps": 1, "weight_kg": 75}, {"reps": 3, "weight_kg": 75},
+            {"reps": 1, "weight_kg": 80, "made": False},  # a miss isn't progress
+        ]}])
+        self.create_workout()  # 2026-10-20: snatch 60 x3, 65 x2
+        self.create_workout(performed_on="2026-10-24", exercises=[{"exercise": self.snatch["id"], "sets": [{"reps": 5}]}])
+        history = self.client.get(f"/api/workouts/exercises/{self.snatch['id']}/history/").json()
+        self.assertEqual([(h["date"], h["weight_kg"], h["reps"]) for h in history],
+                         [("2026-10-20", 65, 2), ("2026-10-22", 75, 3)])  # bodyweight-only workout left out
+        self.assertEqual(self.client.get(f"/api/workouts/exercises/{self.cj['id']}/history/").json()[0]["weight_kg"], 85)
+
+        other = APIClient()
+        other.force_authenticate(User.objects.create_user("bob"))
+        self.assertEqual(other.get(f"/api/workouts/exercises/{self.snatch['id']}/history/").status_code, 404)
+
     def test_create_and_list_workout(self, *_):
         workout = self.create_workout()
         self.assertEqual([e["exercise_name"] for e in workout["exercises"]], ["Snatch", "Clean and Jerk"])

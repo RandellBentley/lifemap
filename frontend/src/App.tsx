@@ -36,6 +36,7 @@ export default function App() {
           <Route path="/events/:id" element={<EventPage />} />
           <Route path="/events/:id/edit" element={<EventEditorPage />} />
           <Route path="/workouts" element={<Workouts page={<WorkoutsPage />} />} />
+          <Route path="/workouts/progress" element={<Workouts page={<WorkoutsPage />} />} />
           <Route path="/workouts/physique" element={<Workouts page={<WorkoutsPage />} />} />
           <Route path="/workouts/physique/new" element={<Workouts page={<ProgressEditorPage />} />} />
           <Route path="/workouts/physique/:id/edit" element={<Workouts page={<ProgressEditorPage />} />} />

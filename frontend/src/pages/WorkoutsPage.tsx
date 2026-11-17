@@ -3,14 +3,18 @@ import { Link, NavLink, useLocation } from 'react-router'
 import { useDeleteProgressReport, useProgressReports, useWorkouts } from '../api/hooks'
 import type { MediaAsset, ProgressReport, Workout } from '../api/types'
 import { Lightbox } from '../components/Lightbox'
+import { LiftProgress } from '../components/LiftProgress'
 import { MediaGrid } from '../components/MediaGrid'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, fromKg, useWeightUnit } from '../lib/weight'
 
-/** /workouts (sessions) and /workouts/physique (physique updates), with a shared kg/lb toggle. */
+/** /workouts (sessions), /workouts/progress (lift charts) and /workouts/physique (physique
+ * updates), with a shared kg/lb toggle. */
 export function WorkoutsPage() {
-  const physique = useLocation().pathname.endsWith('/physique')
+  const { pathname } = useLocation()
+  const physique = pathname.endsWith('/physique')
+  const progress = pathname.endsWith('/progress')
   return (
     <div className="page">
       <div className="page-header">
@@ -32,9 +36,10 @@ export function WorkoutsPage() {
         <NavLink to="/workouts" end>
           Workouts
         </NavLink>
+        <NavLink to="/workouts/progress">Progress</NavLink>
         <NavLink to="/workouts/physique">Physique</NavLink>
       </nav>
-      {physique ? <PhysiqueList /> : <WorkoutList />}
+      {physique ? <PhysiqueList /> : progress ? <LiftProgress /> : <WorkoutList />}
     </div>
   )
 }
