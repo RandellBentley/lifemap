@@ -971,7 +971,10 @@ img, video { max-width: 100%; display: block; }
 /* Narrow screens: the tab links get their own row under the logo and buttons. */
 @media (max-width: 560px) {
   .topbar-inner { flex-wrap: wrap; row-gap: 0.35rem; padding-block: 0.55rem; }
-  .topbar-inner .nav { order: 10; width: 100%; justify-content: space-between; }
+  .topbar-inner .nav { order: 10; width: 100%; justify-content: space-between; gap: 0; }
+  .topbar-inner .nav a { padding-inline: 0.45rem; white-space: nowrap; }
+  /* The tabs scroll on their own if they still don't fit, instead of widening the page. */
+  .topbar-inner .nav { overflow-x: auto; scrollbar-width: none; }
   .topbar-inner .btn.ghost { padding-inline: 0.5rem; }
 }
 
@@ -1005,7 +1008,7 @@ img, video { max-width: 100%; display: block; }
 .sets-table.readonly td { padding-block: 0.45rem; }
 .set-number { color: var(--muted); width: 2.5rem; }
 .reps-input { width: 4.5rem; padding: 0.45rem 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
-.made-toggle { font: inherit; font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.6rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.made-toggle { font: inherit; font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.6rem; border-radius: 999px; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 0.3rem; }
 .made-toggle.made { color: var(--accent); background: transparent; border: 1px solid var(--accent); }
 .made-toggle.missed { color: #fff; background: var(--danger); border: 1px solid var(--danger); }
 .set-result.made { color: var(--muted); }
@@ -1019,5 +1022,13 @@ img, video { max-width: 100%; display: block; }
 .set-video-name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 560px) {
   .sets-table th:nth-child(5), .sets-table td:nth-child(5) { display: none; } /* video */
+  .made-label { display: none; } /* the toggle's aria-label still says made or missed */
+  .made-toggle { padding-inline: 0.55rem; }
+  .sets-table .reps-input { width: 3.25rem; }
+  .sets-table .metric-input input { width: 4.5rem; min-width: 0; }
   .exercise-select { min-width: 0; width: 100%; }
+}
+@media (max-width: 340px) {
+  .sets-table td { padding-right: 0.3rem; }
+  .sets-table .metric-input input { width: 4rem; }
 }

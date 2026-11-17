@@ -248,7 +248,8 @@ function MadeToggle({ made, setNumber, onChange }: { made: boolean; setNumber: n
       aria-label={`Set ${setNumber}: ${made ? 'made' : 'missed'}. Mark as ${made ? 'missed' : 'made'}`}
       onClick={() => onChange(!made)}
     >
-      {made ? '✓ Made' : '✗ Missed'}
+      {made ? '✓' : '✗'}
+      <span className="made-label">{made ? 'Made' : 'Missed'}</span>
     </button>
   )
 }
