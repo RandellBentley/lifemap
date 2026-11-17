@@ -105,6 +105,8 @@ scripts/local-prod.sh restore <dir> [dump]  # replace local data with a backup
 
 **Backups.** Local data lives on one machine, so back it up to another disk, such as an external drive. `backup` must point outside the repository. It keeps the last 30 database dumps in `<dir>/db` and adds new files to `<dir>/media`. Files deleted in the app stay in the backup so older dumps still work.
 
+**Moving to AWS later.** A backup is also how local data moves to AWS: the database dump and the `media/` folder go across unchanged, because local storage uses the same file names as the real bucket. See [Move local data to AWS](docs/runbooks/migrate-local-to-aws.md).
+
 This runs **the same `infra/host/docker-compose.yml` that runs on EC2**: the Caddy origin with the secret-header check, gunicorn, `DEBUG=0`, Postgres, and the same migrate-then-start order. `infra/local/` adds local stand-ins for the AWS services around the host:
 
 | AWS | Local stand-in |
@@ -175,6 +177,8 @@ aws cognito-idp admin-create-user --user-pool-id <id> --username you@example.com
 ```
 
 The script runs `terraform apply`, then pushes the image to ECR, then syncs `infra/host/` to S3, then runs `lifemap-deploy <tag>` on the instance over SSM. On the instance, that pulls the config, writes `.env` from Secrets Manager, runs migrations, and restarts the containers. The first deploy also builds Caddy, which takes a few minutes. Edit the files in `infra/host/` to change the server's setup; they ship with every deploy.
+
+To bring over data from the local stack, follow [Move local data to AWS](docs/runbooks/migrate-local-to-aws.md).
 
 Restore the database from a dump:
 
