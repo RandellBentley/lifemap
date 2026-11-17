@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { errorMessage } from '../api/client'
-import { removeSingleMedia, useInvalidateJournal, useSaveWorkout, useWorkout } from '../api/hooks'
+import { removeSingleMedia, useCreateExercise, useInvalidateJournal, useSaveWorkout, useWorkout } from '../api/hooks'
 import type { MediaAsset, Workout } from '../api/types'
 import { ExerciseSelect } from '../components/ExerciseSelect'
 import { MediaThumb } from '../components/MediaGrid'
@@ -25,6 +25,7 @@ interface ExerciseDraft {
   key: string
   id?: string
   exerciseId: string
+  newExerciseName?: string // typed into "+ Add new exercise…", not yet added
   sets: SetDraft[]
 }
 
@@ -54,6 +55,7 @@ export function WorkoutEditorPage() {
   const navigate = useNavigate()
   const { data: existing } = useWorkout(id)
   const save = useSaveWorkout()
+  const createExercise = useCreateExercise()
   const invalidate = useInvalidateJournal()
 
   const [performedOn, setPerformedOn] = useState(() => dayKey(new Date()))
@@ -75,26 +77,31 @@ export function WorkoutEditorPage() {
   const updateSet = (ek: string, sk: string, patch: Partial<SetDraft>) =>
     setExercises((list) => list.map((e) => (e.key === ek ? { ...e, sets: e.sets.map((s) => (s.key === sk ? { ...s, ...patch } : s)) } : e)))
 
-  const problem = (() => {
-    if (exercises.length === 0) return 'Add at least one exercise.'
-    if (exercises.some((e) => !e.exerciseId)) return 'Choose an exercise for each block.'
-    if (exercises.some((e) => e.sets.length === 0)) return 'Each exercise needs at least one set.'
-    if (exercises.some((e) => e.sets.some((s) => s.reps === null))) return 'Enter reps for every set.'
-    return null
-  })()
-
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (problem) return setError(problem)
     setError(null)
-    setStatus('Saving…')
     try {
+      // A typed name counts as choosing that exercise, even if "Add" wasn't clicked.
+      let list = exercises
+      if (list.some(pendingName)) {
+        setStatus('Adding exercises…')
+        list = [...list]
+        for (const [i, ex] of list.entries()) {
+          // One at a time: two blocks with the same new name get the same exercise.
+          if (pendingName(ex)) list[i] = { ...ex, exerciseId: (await createExercise.mutateAsync(ex.newExerciseName!)).id, newExerciseName: undefined }
+        }
+        setExercises(list)
+      }
+      const problem = findProblem(list)
+      if (problem) return setError(problem)
+
+      setStatus('Saving…')
       const workout = await save.mutateAsync({
         id: savedId,
         data: {
           performed_on: performedOn,
           notes,
-          exercises: exercises.map((ex) => ({
+          exercises: list.map((ex) => ({
             id: ex.id,
             exercise: ex.exerciseId,
             sets: ex.sets.map((s) => ({ id: s.id, reps: s.reps!, weight_kg: s.weightKg, made: s.made })),
@@ -106,7 +113,7 @@ export function WorkoutEditorPage() {
       // The response lists exercises and sets in the order we sent them, which maps each draft
       // to its saved set id; then attach or remove videos per set.
       const jobs: { setId: string; draft: SetDraft }[] = []
-      workout.exercises.forEach((we, i) => we.sets.forEach((ws, j) => jobs.push({ setId: ws.id, draft: exercises[i].sets[j] })))
+      workout.exercises.forEach((we, i) => we.sets.forEach((ws, j) => jobs.push({ setId: ws.id, draft: list[i].sets[j] })))
       // Keep ids so a retry after a failed upload updates instead of duplicating.
       setExercises((list) => list.map((ex, i) => ({ ...ex, id: workout.exercises[i].id, sets: ex.sets.map((s, j) => ({ ...s, id: workout.exercises[i].sets[j].id })) })))
 
@@ -149,7 +156,12 @@ export function WorkoutEditorPage() {
         <section key={ex.key} className="card exercise-block">
           <div className="exercise-block-head">
             <span className="muted small">Exercise {ei + 1}</span>
-            <ExerciseSelect value={ex.exerciseId} onChange={(exerciseId) => updateExercise(ex.key, { exerciseId })} />
+            <ExerciseSelect
+              value={ex.exerciseId}
+              onChange={(exerciseId) => updateExercise(ex.key, { exerciseId })}
+              newName={ex.newExerciseName}
+              onNewNameChange={(newExerciseName) => updateExercise(ex.key, { newExerciseName })}
+            />
             <span className="spacer" />
             {exercises.length > 1 && (
               <button type="button" className="btn ghost small" onClick={() => setExercises((l) => l.filter((x) => x.key !== ex.key))}>
@@ -237,6 +249,17 @@ export function WorkoutEditorPage() {
       </div>
     </form>
   )
+}
+
+const pendingName = (ex: ExerciseDraft) => !!ex.newExerciseName?.trim()
+
+function findProblem(exercises: ExerciseDraft[]): string | null {
+  if (exercises.length === 0) return 'Add at least one exercise.'
+  const unchosen = exercises.findIndex((e) => !e.exerciseId)
+  if (unchosen >= 0) return `Choose an exercise for exercise ${unchosen + 1}.`
+  if (exercises.some((e) => e.sets.length === 0)) return 'Each exercise needs at least one set.'
+  if (exercises.some((e) => e.sets.some((s) => s.reps === null))) return 'Enter reps for every set.'
+  return null
 }
 
 /** Made by default; one tap marks the lift as missed (and back). */
