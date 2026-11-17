@@ -1005,6 +1005,12 @@ img, video { max-width: 100%; display: block; }
 .sets-table.readonly td { padding-block: 0.45rem; }
 .set-number { color: var(--muted); width: 2.5rem; }
 .reps-input { width: 4.5rem; padding: 0.45rem 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.made-toggle { font: inherit; font-size: 0.85rem; font-weight: 600; padding: 0.35rem 0.6rem; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.made-toggle.made { color: var(--accent); background: transparent; border: 1px solid var(--accent); }
+.made-toggle.missed { color: #fff; background: var(--danger); border: 1px solid var(--danger); }
+.set-result.made { color: var(--muted); }
+.set-result.missed { color: var(--danger); font-weight: 600; }
+.missed-set td:not(.set-result) { color: var(--muted); }
 .set-video { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
 .set-video-thumb { position: relative; display: inline-block; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; background: var(--border); padding: 0; border: 0; }
 .set-video-thumb.clickable { cursor: zoom-in; }
@@ -1012,6 +1018,6 @@ img, video { max-width: 100%; display: block; }
 .set-video-thumb .badge { font-size: 0.6rem; }
 .set-video-name { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 560px) {
-  .sets-table th:nth-child(4), .sets-table td:nth-child(4) { display: none; }
+  .sets-table th:nth-child(5), .sets-table td:nth-child(5) { display: none; } /* video */
   .exercise-select { min-width: 0; width: 100%; }
 }

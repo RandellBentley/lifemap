@@ -47,7 +47,7 @@ class SetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkoutSet
-        fields = ["id", "reps", "weight_kg", "video"]
+        fields = ["id", "reps", "weight_kg", "made", "video"]
 
     def get_video(self, workout_set):
         asset = next(iter(workout_set.media.all()), None)
@@ -130,6 +130,7 @@ class WorkoutSerializer(serializers.ModelSerializer):
             if ws is None:
                 ws = WorkoutSet(workout_exercise=workout_exercise)
             ws.position, ws.reps, ws.weight_kg = position, data["reps"], data.get("weight_kg")
+            ws.made = data.get("made", True)
             ws.save()
             kept.add(ws.id)
         removed = [s_id for s_id in existing if s_id not in kept]

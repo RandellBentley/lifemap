@@ -91,7 +91,9 @@ function WorkoutCard({ workout }: { workout: Workout }) {
           <li key={e.id}>
             <span className="workout-summary-name">{e.exercise_name}</span>
             <span className="muted">
-              {e.sets.map((s) => (s.weight_kg === null ? `${s.reps}` : `${s.reps} × ${formatWeight(s.weight_kg, unit)}`)).join(', ')}
+              {e.sets
+                .map((s) => (s.weight_kg === null ? `${s.reps}` : `${s.reps} × ${formatWeight(s.weight_kg, unit)}`) + (s.made ? '' : ' (missed)'))
+                .join(', ')}
             </span>
           </li>
         ))}

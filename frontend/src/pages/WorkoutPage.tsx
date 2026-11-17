@@ -83,15 +83,17 @@ export function WorkoutPage() {
                 <th>Set</th>
                 <th>Reps</th>
                 <th>Weight</th>
+                <th>Result</th>
                 <th>Video</th>
               </tr>
             </thead>
             <tbody>
               {e.sets.map((s, i) => (
-                <tr key={s.id}>
+                <tr key={s.id} className={s.made ? undefined : 'missed-set'}>
                   <td className="set-number">{i + 1}</td>
                   <td>{s.reps}</td>
                   <td>{formatWeight(s.weight_kg, unit)}</td>
+                  <td className={s.made ? 'set-result made' : 'set-result missed'}>{s.made ? 'Made' : 'Missed'}</td>
                   <td>
                     {s.video && (
                       <button className="set-video-thumb clickable" onClick={() => setOpenId(s.video!.id)} aria-label={`Play set ${i + 1} video`}>

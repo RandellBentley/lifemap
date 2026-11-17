@@ -15,6 +15,7 @@ interface SetDraft {
   id?: string
   reps: number | null
   weightKg: number | null
+  made: boolean
   video: MediaAsset | null // already attached
   newVideo: File | null // chosen, uploads after save
   removeVideo: boolean
@@ -32,6 +33,7 @@ const blankSet = (from?: SetDraft): SetDraft => ({
   key: key(),
   reps: from?.reps ?? null,
   weightKg: from?.weightKg ?? null, // "+ Add set" repeats the previous set's numbers
+  made: true, // ...but not a miss
   video: null,
   newVideo: null,
   removeVideo: false,
@@ -43,7 +45,7 @@ function toDrafts(workout: Workout): ExerciseDraft[] {
     key: key(),
     id: e.id,
     exerciseId: e.exercise,
-    sets: e.sets.map((s) => ({ key: key(), id: s.id, reps: s.reps, weightKg: s.weight_kg, video: s.video, newVideo: null, removeVideo: false })),
+    sets: e.sets.map((s) => ({ key: key(), id: s.id, reps: s.reps, weightKg: s.weight_kg, made: s.made, video: s.video, newVideo: null, removeVideo: false })),
   }))
 }
 
@@ -95,7 +97,7 @@ export function WorkoutEditorPage() {
           exercises: exercises.map((ex) => ({
             id: ex.id,
             exercise: ex.exerciseId,
-            sets: ex.sets.map((s) => ({ id: s.id, reps: s.reps!, weight_kg: s.weightKg })),
+            sets: ex.sets.map((s) => ({ id: s.id, reps: s.reps!, weight_kg: s.weightKg, made: s.made })),
           })),
         },
       })
@@ -162,6 +164,7 @@ export function WorkoutEditorPage() {
                 <th>Set</th>
                 <th>Reps</th>
                 <th>Weight</th>
+                <th>Result</th>
                 <th>Video (optional)</th>
                 <th aria-label="Remove" />
               </tr>
@@ -183,6 +186,9 @@ export function WorkoutEditorPage() {
                   </td>
                   <td>
                     <WeightInput valueKg={s.weightKg} onChange={(weightKg) => updateSet(ex.key, s.key, { weightKg })} aria-label={`Set ${si + 1} weight`} />
+                  </td>
+                  <td>
+                    <MadeToggle made={s.made} setNumber={si + 1} onChange={(made) => updateSet(ex.key, s.key, { made })} />
                   </td>
                   <td>
                     <SetVideoField set={s} disabled={busy} onChange={(patch) => updateSet(ex.key, s.key, patch)} />
@@ -230,6 +236,20 @@ export function WorkoutEditorPage() {
         </button>
       </div>
     </form>
+  )
+}
+
+/** Made by default; one tap marks the lift as missed (and back). */
+function MadeToggle({ made, setNumber, onChange }: { made: boolean; setNumber: number; onChange: (made: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      className={`made-toggle ${made ? 'made' : 'missed'}`}
+      aria-label={`Set ${setNumber}: ${made ? 'made' : 'missed'}. Mark as ${made ? 'missed' : 'made'}`}
+      onClick={() => onChange(!made)}
+    >
+      {made ? '✓ Made' : '✗ Missed'}
+    </button>
   )
 }
 

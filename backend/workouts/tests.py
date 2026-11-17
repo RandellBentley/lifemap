@@ -89,6 +89,18 @@ class WorkoutApiTests(TestCase):
         self.assertEqual([w["performed_on"] for w in listed], ["2026-10-22", "2026-10-20"])
         self.assertIsNone(listed[0]["exercises"][0]["sets"][0]["weight_kg"])  # bodyweight set
 
+    def test_sets_are_made_unless_marked_missed(self, *_):
+        workout = self.create_workout(exercises=[
+            {"exercise": self.snatch["id"], "sets": [{"reps": 1, "weight_kg": 80}, {"reps": 1, "weight_kg": 85, "made": False}]},
+        ])
+        sets = workout["exercises"][0]["sets"]
+        self.assertEqual([s["made"] for s in sets], [True, False])
+        # Editing a missed set into a made one, as the editor's toggle does.
+        sets[1]["made"] = True
+        exercises = [{"id": workout["exercises"][0]["id"], "exercise": self.snatch["id"], "sets": sets}]
+        resp = self.client.put(f"/api/workouts/{workout['id']}/", {**workout, "exercises": exercises}, format="json")
+        self.assertEqual([s["made"] for s in resp.data["exercises"][0]["sets"]], [True, True])
+
     def test_pounds_round_trip_exactly(self, *_):
         kg = (Decimal(225) * LB).quantize(Decimal("0.0001"))  # what the frontend sends for 225 lb
         workout = self.create_workout(exercises=[{"exercise": self.snatch["id"], "sets": [{"reps": 1, "weight_kg": kg}]}])

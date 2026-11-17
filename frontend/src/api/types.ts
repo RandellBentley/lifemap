@@ -276,6 +276,7 @@ export interface WorkoutSet {
   id: string
   reps: number
   weight_kg: number | null
+  made: boolean // false = a missed lift
   video: MediaAsset | null
 }
 
@@ -299,7 +300,7 @@ export interface Workout {
 export interface WorkoutInput {
   performed_on: string
   notes: string
-  exercises: { id?: string; exercise: string; sets: { id?: string; reps: number; weight_kg: number | null }[] }[]
+  exercises: { id?: string; exercise: string; sets: { id?: string; reps: number; weight_kg: number | null; made: boolean }[] }[]
 }
 
 export interface ProgressReport {

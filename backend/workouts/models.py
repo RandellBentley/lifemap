@@ -68,19 +68,20 @@ class WorkoutExercise(models.Model):
 
 
 class WorkoutSet(models.Model):
-    """One set: reps, optional weight, optional video (MediaAsset with workout_set=this)."""
+    """One set: reps, optional weight, made or missed, optional video (MediaAsset with workout_set=this)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workout_exercise = models.ForeignKey(WorkoutExercise, on_delete=models.CASCADE, related_name="sets")
     position = models.PositiveIntegerField(default=0)
     reps = models.PositiveIntegerField()
     weight_kg = models.DecimalField(**WEIGHT, null=True, blank=True)  # null for bodyweight work
+    made = models.BooleanField(default=True)  # False = a missed lift
 
     class Meta:
         ordering = ["position"]
 
     def __str__(self):
-        return f"{self.reps} reps @ {self.weight_kg} kg"
+        return f"{self.reps} reps @ {self.weight_kg} kg{'' if self.made else ' (missed)'}"
 
 
 class ProgressReport(models.Model):
