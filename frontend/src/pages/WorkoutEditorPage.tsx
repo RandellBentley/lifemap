@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { errorMessage } from '../api/client'
+import { api, errorMessage } from '../api/client'
 import { removeSingleMedia, useCreateExercise, useInvalidateJournal, useSaveWorkout, useWorkout } from '../api/hooks'
-import type { MediaAsset, Workout } from '../api/types'
+import type { MediaAsset, Physique, Workout } from '../api/types'
 import { ExerciseSelect } from '../components/ExerciseSelect'
 import { MediaThumb } from '../components/MediaGrid'
+import { MediaPicker, type QueuedFile } from '../components/MediaPicker'
 import { WeightInput } from '../components/WeightInput'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { dayKey } from '../lib/dates'
@@ -65,12 +66,27 @@ export function WorkoutEditorPage() {
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Optional physique update. Photo removals and uploads wait for Save, like set videos.
+  const [physiqueOpen, setPhysiqueOpen] = useState(false)
+  const [bodyWeightKg, setBodyWeightKg] = useState<number | null>(null)
+  const [savedPhysique, setSavedPhysique] = useState<Physique | null>(null)
+  const [keptPhotos, setKeptPhotos] = useState<MediaAsset[]>([])
+  const [photoQueue, setPhotoQueue] = useState<QueuedFile[]>([])
+
+  // Load the saved workout once: it refetches every few seconds while media processes, and
+  // copying it in again would wipe unsaved edits.
+  const [loadedId, setLoadedId] = useState<string>()
   useEffect(() => {
-    if (!existing) return
+    if (!existing || existing.id === loadedId) return
     setPerformedOn(existing.performed_on)
     setNotes(existing.notes)
     setExercises(toDrafts(existing))
-  }, [existing])
+    setPhysiqueOpen(!!existing.physique)
+    setBodyWeightKg(existing.physique?.body_weight_kg ?? null)
+    setSavedPhysique(existing.physique)
+    setKeptPhotos(existing.physique?.photos ?? [])
+    setLoadedId(existing.id)
+  }, [existing, loadedId])
 
   const updateExercise = (k: string, patch: Partial<ExerciseDraft>) =>
     setExercises((list) => list.map((e) => (e.key === k ? { ...e, ...patch } : e)))
@@ -95,12 +111,17 @@ export function WorkoutEditorPage() {
       const problem = findProblem(list)
       if (problem) return setError(problem)
 
+      // An open section with nothing in it counts as no update.
+      const hasPhysique = physiqueOpen && (bodyWeightKg !== null || keptPhotos.length > 0 || photoQueue.length > 0)
+
       setStatus('Saving…')
       const workout = await save.mutateAsync({
         id: savedId,
         data: {
           performed_on: performedOn,
           notes,
+          // Omitted: nothing to change. null: delete the saved one along with its photos.
+          physique: hasPhysique ? { body_weight_kg: bodyWeightKg } : savedPhysique ? null : undefined,
           exercises: list.map((ex) => ({
             id: ex.id,
             exercise: ex.exerciseId,
@@ -128,6 +149,23 @@ export function WorkoutEditorPage() {
         } else if (draft.removeVideo && draft.video) {
           await removeSingleMedia(path)
         }
+      }
+
+      setSavedPhysique(workout.physique)
+      if (workout.physique) {
+        const removed = workout.physique.photos.filter((p) => !keptPhotos.some((k) => k.id === p.id))
+        for (const photo of removed) await api<void>(`/media/${photo.id}/`, { method: 'DELETE' })
+        setKeptPhotos(workout.physique.photos.filter((p) => !removed.includes(p)))
+        for (const [i, item] of photoQueue.entries()) {
+          setStatus(`Uploading photo ${i + 1} of ${photoQueue.length}…`)
+          const upload = (progress: number) => setPhotoQueue((q) => q.map((x) => (x.id === item.id ? { ...x, progress } : x)))
+          await uploadSingle(`/workouts/progress/${workout.physique.id}/photos/`, item.file, upload, item.tags)
+          // Done ones leave the queue, so a retry after a failure doesn't upload them twice.
+          setPhotoQueue((q) => q.filter((x) => x.id !== item.id))
+        }
+      } else {
+        setKeptPhotos([])
+        setPhotoQueue([]) // the section was removed before these were uploaded
       }
       await invalidate()
       navigate(`/workouts/${workout.id}`)
@@ -230,6 +268,56 @@ export function WorkoutEditorPage() {
       <button type="button" className="btn" onClick={() => setExercises((l) => [...l, blankExercise()])}>
         + Add exercise
       </button>
+
+      {physiqueOpen ? (
+        <section className="card physique-block">
+          <div className="exercise-block-head">
+            <h2 className="exercise-title">Physique update</h2>
+            <span className="spacer" />
+            <button type="button" className="btn ghost small" disabled={busy} onClick={() => setPhysiqueOpen(false)}>
+              Remove
+            </button>
+          </div>
+          <label className="field">
+            <span>
+              Body weight <span className="muted">(optional)</span>
+            </span>
+            <WeightInput valueKg={bodyWeightKg} onChange={setBodyWeightKg} />
+          </label>
+          {keptPhotos.length > 0 && (
+            <div className="existing-media">
+              {keptPhotos.map((photo) => (
+                <div key={photo.id} className="existing-media-item">
+                  <MediaThumb asset={photo} />
+                  <button type="button" className="btn ghost small" disabled={busy} onClick={() => setKeptPhotos((l) => l.filter((p) => p.id !== photo.id))}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <MediaPicker
+            queue={photoQueue}
+            disabled={busy}
+            onAdd={(files) =>
+              setPhotoQueue((q) => [
+                ...q,
+                ...files.filter((f) => f.type.startsWith('image/')).map((file) => ({ id: crypto.randomUUID(), file, tags: [], progress: 0 })),
+              ])
+            }
+            onRemove={(qid) => setPhotoQueue((q) => q.filter((x) => x.id !== qid))}
+            onTagsChange={(qid, tags) => setPhotoQueue((q) => q.map((x) => (x.id === qid ? { ...x, tags } : x)))}
+          />
+          <span className="muted small">
+            Photos only. They also appear under Physique, and stay off the Photos page.
+            {savedPhysique && ' Removing this update deletes its photos when you save.'}
+          </span>
+        </section>
+      ) : (
+        <button type="button" className="btn" onClick={() => setPhysiqueOpen(true)}>
+          + Add physique update <span className="muted">(optional)</span>
+        </button>
+      )}
 
       <label className="field">
         <span>

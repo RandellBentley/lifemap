@@ -179,6 +179,42 @@ class WorkoutApiTests(TestCase):
         self.assertFalse(MediaAsset.objects.exists())
         self.assertEqual(len(delete_objects.call_args.args[0]), 2)
 
+    def test_workout_with_physique_update(self, delete_objects, *_):
+        workout = self.create_workout(physique={"body_weight_kg": 82.5})
+        physique = workout["physique"]
+        self.assertEqual((physique["body_weight_kg"], physique["photos"]), (82.5, []))
+        for _i in range(2):
+            ticket = self.client.post(f"/api/workouts/progress/{physique['id']}/photos/", PHOTO, format="json")
+            self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        url = f"/api/workouts/{workout['id']}/"
+
+        # Saving the workout without `physique` keeps it, photos included, and moves it to the new date.
+        resp = self.client.patch(url, {"performed_on": "2026-10-21"}, format="json").json()
+        self.assertEqual((resp["physique"]["id"], len(resp["physique"]["photos"])), (physique["id"], 2))
+        report = self.client.get("/api/workouts/progress/").json()[0]
+        self.assertEqual((report["recorded_on"], report["workout"]), ("2026-10-21", workout["id"]))
+        # Its date belongs to the workout.
+        moved = self.client.patch(f"/api/workouts/progress/{physique['id']}/", {"recorded_on": "2026-10-01"}, format="json")
+        self.assertEqual(moved.status_code, 400)
+
+        resp = self.client.patch(url, {"physique": {"body_weight_kg": 83}}, format="json").json()
+        self.assertEqual((resp["physique"]["id"], resp["physique"]["body_weight_kg"]), (physique["id"], 83))
+
+        # Deleting the workout keeps the update as a standalone one.
+        self.client.delete(url)
+        report = self.client.get("/api/workouts/progress/").json()[0]
+        self.assertEqual((report["workout"], len(report["photos"])), (None, 2))
+
+    def test_removing_physique_update_deletes_its_photos(self, delete_objects, *_):
+        workout = self.create_workout(physique={"body_weight_kg": None})
+        ticket = self.client.post(f"/api/workouts/progress/{workout['physique']['id']}/photos/", PHOTO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        resp = self.client.patch(f"/api/workouts/{workout['id']}/", {"physique": None}, format="json").json()
+        self.assertIsNone(resp["physique"])
+        self.assertFalse(ProgressReport.objects.exists())
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertIsNone(self.create_workout()["physique"])  # optional
+
     def test_workout_media_stays_off_the_photos_page(self, *_):
         self.upload_video(self.create_workout()["exercises"][0]["sets"][0]["id"])
         report = ProgressReport.objects.create(user=self.user, recorded_on=dt.date(2026, 10, 1))

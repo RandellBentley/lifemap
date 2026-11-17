@@ -287,20 +287,30 @@ export interface WorkoutExercise {
   sets: WorkoutSet[]
 }
 
+/** A workout's optional physique update (stored as a progress report dated the workout's day). */
+export interface Physique {
+  id: string
+  body_weight_kg: number | null
+  photos: MediaAsset[]
+}
+
 export interface Workout {
   id: string
   performed_on: string
   notes: string
   exercises: WorkoutExercise[]
+  physique: Physique | null
   created_at: string
   updated_at: string
 }
 
-/** Nested write: ids keep existing exercises/sets (and their videos); omit them for new ones. */
+/** Nested write: ids keep existing exercises/sets (and their videos); omit them for new ones.
+ * `physique`: omit to keep it as is, null to delete it (and its photos). */
 export interface WorkoutInput {
   performed_on: string
   notes: string
   exercises: { id?: string; exercise: string; sets: { id?: string; reps: number; weight_kg: number | null; made: boolean }[] }[]
+  physique?: { body_weight_kg: number | null } | null
 }
 
 export interface ProgressReport {
@@ -309,6 +319,7 @@ export interface ProgressReport {
   body_weight_kg: number | null
   notes: string
   photos: MediaAsset[]
+  workout: string | null // set when it's part of a workout, which then owns its date
   created_at: string
   updated_at: string
 }

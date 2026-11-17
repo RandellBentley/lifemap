@@ -7,6 +7,8 @@ from journal.uploads import delete_media
 
 from .models import WEIGHT, Exercise, ProgressReport, Workout, WorkoutExercise, WorkoutSet
 
+UNCHANGED = object()  # a nested field left out of a write, as opposed to null
+
 
 def _user(serializer):
     return serializer.context["request"].user
@@ -70,18 +72,38 @@ class WorkoutExerciseSerializer(serializers.ModelSerializer):
         return sets
 
 
+class PhysiqueSerializer(serializers.ModelSerializer):
+    """A workout's physique update. Photos are added through /workouts/progress/{id}/photos/."""
+
+    body_weight_kg = serializers.DecimalField(
+        **WEIGHT, min_value=0, allow_null=True, required=False, coerce_to_string=False
+    )
+    photos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProgressReport
+        fields = ["id", "body_weight_kg", "photos"]
+        read_only_fields = ["id"]
+
+    def get_photos(self, report):
+        return MediaAssetSerializer(report.photos.all(), many=True, context=self.context).data
+
+
 class WorkoutSerializer(serializers.ModelSerializer):
     """
-    Written as one nested document: {performed_on, notes, exercises: [{exercise, sets: [...]}]}.
+    Written as one nested document: {performed_on, notes, exercises: [{exercise, sets: [...]}],
+    physique?: {body_weight_kg} | null}.
     On update, exercises and sets carrying an `id` are updated in place (keeping set videos);
     ones without are created; existing ones left out are deleted, along with their videos.
+    `physique` is optional: leaving it out keeps the current one, null deletes it with its photos.
     """
 
     exercises = WorkoutExerciseSerializer(many=True)
+    physique = PhysiqueSerializer(required=False, allow_null=True)
 
     class Meta:
         model = Workout
-        fields = ["id", "performed_on", "notes", "exercises", "created_at", "updated_at"]
+        fields = ["id", "performed_on", "notes", "exercises", "physique", "created_at", "updated_at"]
         read_only_fields = ["created_at", "updated_at"]
 
     def validate_exercises(self, exercises):
@@ -92,19 +114,41 @@ class WorkoutSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         exercises = validated_data.pop("exercises")
+        physique = validated_data.pop("physique", UNCHANGED)
         workout = Workout.objects.create(**validated_data)
         self._sync(workout, exercises)
+        self._sync_physique(workout, physique)
         return workout
 
     @transaction.atomic
     def update(self, instance, validated_data):
         exercises = validated_data.pop("exercises", None)
+        physique = validated_data.pop("physique", UNCHANGED)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
         if exercises is not None:
             self._sync(instance, exercises)
+        self._sync_physique(instance, physique)
         return instance
+
+    @staticmethod
+    def _sync_physique(workout, data):
+        report = ProgressReport.objects.filter(workout=workout).first()
+        if data is None:
+            if report:
+                delete_media(report.photos.all())
+                report.delete()
+        elif data is not UNCHANGED or report:
+            report = report or ProgressReport(user=workout.user, workout=workout)
+            report.recorded_on = workout.performed_on  # follows the workout's date
+            if data is not UNCHANGED:
+                report.body_weight_kg = data.get("body_weight_kg")
+            report.save()
+        # The response must not show a physique update cached from before this save.
+        relation = Workout._meta.get_field("physique")
+        if relation.is_cached(workout):
+            relation.delete_cached_value(workout)
 
     def _sync(self, workout, exercises):
         existing = {we.id: we for we in workout.exercises.prefetch_related("sets")}
@@ -154,8 +198,13 @@ class ProgressReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProgressReport
-        fields = ["id", "recorded_on", "body_weight_kg", "notes", "photos", "created_at", "updated_at"]
-        read_only_fields = ["created_at", "updated_at"]
+        fields = ["id", "recorded_on", "body_weight_kg", "notes", "photos", "workout", "created_at", "updated_at"]
+        read_only_fields = ["workout", "created_at", "updated_at"]
+
+    def validate_recorded_on(self, value):
+        if self.instance and self.instance.workout_id and value != self.instance.recorded_on:
+            raise serializers.ValidationError("This update is part of a workout; change the workout's date instead.")
+        return value
 
     def get_photos(self, report):
         return MediaAssetSerializer(report.photos.all(), many=True, context=self.context).data

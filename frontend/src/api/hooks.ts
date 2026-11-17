@@ -474,7 +474,8 @@ export function useCreateExercise() {
   })
 }
 
-const workoutBusy = (w: Workout) => w.exercises.some((e) => e.sets.some((s) => s.video && isProcessing(s.video)))
+const workoutBusy = (w: Workout) =>
+  w.exercises.some((e) => e.sets.some((s) => s.video && isProcessing(s.video))) || !!w.physique?.photos.some(isProcessing)
 
 /** Newest first, cursor-paginated. */
 export function useWorkouts() {

@@ -8,18 +8,18 @@ import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, fromKg, useWeightUnit } from '../lib/weight'
 
-/** /workouts (sessions) and /workouts/progress (progress reports), with a shared kg/lb toggle. */
+/** /workouts (sessions) and /workouts/physique (physique updates), with a shared kg/lb toggle. */
 export function WorkoutsPage() {
-  const progress = useLocation().pathname.endsWith('/progress')
+  const physique = useLocation().pathname.endsWith('/physique')
   return (
     <div className="page">
       <div className="page-header">
         <h1>Workouts</h1>
         <div className="btn-group">
           <WeightUnitToggle />
-          {progress ? (
-            <Link to="/workouts/progress/new" className="btn primary">
-              + Progress report
+          {physique ? (
+            <Link to="/workouts/physique/new" className="btn primary">
+              + Physique update
             </Link>
           ) : (
             <Link to="/workouts/new" className="btn primary">
@@ -32,9 +32,9 @@ export function WorkoutsPage() {
         <NavLink to="/workouts" end>
           Workouts
         </NavLink>
-        <NavLink to="/workouts/progress">Progress</NavLink>
+        <NavLink to="/workouts/physique">Physique</NavLink>
       </nav>
-      {progress ? <ProgressList /> : <WorkoutList />}
+      {physique ? <PhysiqueList /> : <WorkoutList />}
     </div>
   )
 }
@@ -98,25 +98,32 @@ function WorkoutCard({ workout }: { workout: Workout }) {
           </li>
         ))}
       </ul>
+      {workout.physique && (
+        <p className="muted small">
+          Physique update
+          {workout.physique.body_weight_kg !== null && ` · ${formatWeight(workout.physique.body_weight_kg, unit)}`}
+          {workout.physique.photos.length > 0 && ` · ${workout.physique.photos.length} ${workout.physique.photos.length === 1 ? 'photo' : 'photos'}`}
+        </p>
+      )}
       {workout.notes && <p className="muted small workout-notes">{workout.notes}</p>}
     </Link>
   )
 }
 
-function ProgressList() {
+function PhysiqueList() {
   const { data: reports = [], isPending, isError } = useProgressReports()
   const photos = useMemo(() => reports.flatMap((r) => r.photos.filter((p) => p.status !== 'failed')), [reports])
   const [openId, setOpenId] = useState<string | null>(null)
   const openIndex = openId ? photos.findIndex((p) => p.id === openId) : -1
 
   if (isPending) return <p className="muted">Loading…</p>
-  if (isError) return <p className="error">Couldn’t load progress reports.</p>
+  if (isError) return <p className="error">Couldn’t load physique updates.</p>
   if (reports.length === 0) {
     return (
       <div className="empty">
-        <p>No progress reports yet. Log your weight and a few photos to see change over time.</p>
-        <Link to="/workouts/progress/new" className="btn primary">
-          Add your first report
+        <p>No physique updates yet. Add your body weight and a few photos when you log a workout, or on their own.</p>
+        <Link to="/workouts/physique/new" className="btn primary">
+          Add your first update
         </Link>
       </div>
     )
@@ -126,7 +133,7 @@ function ProgressList() {
       <ul className="workout-list">
         {reports.map((r, i) => (
           <li key={r.id}>
-            <ProgressCard report={r} previous={reports.slice(i + 1).find((x) => x.body_weight_kg !== null)} onOpen={(a) => setOpenId(a.id)} />
+            <PhysiqueCard report={r} previous={reports.slice(i + 1).find((x) => x.body_weight_kg !== null)} onOpen={(a) => setOpenId(a.id)} />
           </li>
         ))}
       </ul>
@@ -137,7 +144,7 @@ function ProgressList() {
   )
 }
 
-function ProgressCard({ report, previous, onOpen }: { report: ProgressReport; previous?: ProgressReport; onOpen: (a: MediaAsset) => void }) {
+function PhysiqueCard({ report, previous, onOpen }: { report: ProgressReport; previous?: ProgressReport; onOpen: (a: MediaAsset) => void }) {
   const [unit] = useWeightUnit()
   const remove = useDeleteProgressReport()
   const [confirming, setConfirming] = useState(false)
@@ -151,13 +158,20 @@ function ProgressCard({ report, previous, onOpen }: { report: ProgressReport; pr
       <div className="workout-card-head">
         <strong>{formatDay(report.recorded_on)}</strong>
         <div className="btn-group">
-          <Link to={`/workouts/progress/${report.id}/edit`} className="btn ghost small">
-            Edit
-          </Link>
+          {report.workout ? (
+            // Part of a workout, so it's edited there (the workout owns its date).
+            <Link to={`/workouts/${report.workout}`} className="btn ghost small">
+              View workout
+            </Link>
+          ) : (
+            <Link to={`/workouts/physique/${report.id}/edit`} className="btn ghost small">
+              Edit
+            </Link>
+          )}
           {confirming ? (
             <>
               <button className="btn danger small" disabled={remove.isPending} onClick={() => remove.mutate(report.id)}>
-                Delete report & {report.photos.length} photos
+                Delete update & {report.photos.length} photos
               </button>
               <button className="btn ghost small" onClick={() => setConfirming(false)}>
                 Cancel

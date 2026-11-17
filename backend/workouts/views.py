@@ -84,13 +84,15 @@ class WorkoutViewSet(viewsets.ModelViewSet):
         sets = WorkoutSet.objects.prefetch_related(Prefetch("media", queryset=MEDIA))
         exercises = WorkoutExercise.objects.select_related("exercise").prefetch_related(Prefetch("sets", queryset=sets))
         return Workout.objects.filter(user=self.request.user).prefetch_related(
-            Prefetch("exercises", queryset=exercises)
+            Prefetch("exercises", queryset=exercises),
+            Prefetch("physique__photos", queryset=MEDIA.order_by("created_at")),
         )
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
     def perform_destroy(self, workout):
+        # Its physique update, if any, stays on as a standalone one (with its photos).
         delete_media(MediaAsset.objects.filter(workout_set__workout_exercise__workout=workout))
         workout.delete()
 

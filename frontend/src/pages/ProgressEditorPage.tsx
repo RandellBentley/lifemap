@@ -9,7 +9,7 @@ import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { dayKey } from '../lib/dates'
 import { uploadSingle } from '../lib/upload'
 
-/** New or edit progress report: date, body weight, notes, photos. */
+/** New or edit a standalone physique update: date, body weight, notes, photos. */
 export function ProgressEditorPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -57,8 +57,8 @@ export function ProgressEditorPage() {
         }
       }
       await invalidate()
-      if (failed) setError('The report was saved, but some photos failed to upload. Save again to retry them.')
-      else navigate('/workouts/progress')
+      if (failed) setError('The update was saved, but some photos failed to upload. Save again to retry them.')
+      else navigate('/workouts/physique')
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -71,7 +71,7 @@ export function ProgressEditorPage() {
   return (
     <form className="page editor" onSubmit={onSubmit}>
       <div className="page-header">
-        <h1>{id ? 'Edit progress report' : 'Progress report'}</h1>
+        <h1>{id ? 'Edit physique update' : 'Physique update'}</h1>
         <WeightUnitToggle />
       </div>
 
@@ -131,7 +131,7 @@ export function ProgressEditorPage() {
       {error && <p className="error pre">{error}</p>}
       <div className="btn-group">
         <button type="submit" className="btn primary" disabled={saving}>
-          {saving ? 'Saving…' : 'Save report'}
+          {saving ? 'Saving…' : 'Save update'}
         </button>
         <button type="button" className="btn ghost" disabled={saving} onClick={() => navigate(-1)}>
           Cancel

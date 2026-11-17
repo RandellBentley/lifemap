@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { useDeleteWorkout, useWorkout } from '../api/hooks'
 import type { MediaAsset } from '../api/types'
 import { Lightbox } from '../components/Lightbox'
-import { MediaThumb } from '../components/MediaGrid'
+import { MediaGrid, MediaThumb } from '../components/MediaGrid'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, useWeightUnit } from '../lib/weight'
@@ -16,12 +16,13 @@ export function WorkoutPage() {
   const [unit] = useWeightUnit()
   const [confirming, setConfirming] = useState(false)
 
-  const videos = useMemo(
-    () => workout?.exercises.flatMap((e) => e.sets.map((s) => s.video).filter((v): v is MediaAsset => !!v && v.status !== 'failed')) ?? [],
-    [workout],
-  )
+  // Set videos, then physique photos: one lightbox steps through all of them.
+  const media = useMemo(() => {
+    const videos = workout?.exercises.flatMap((e) => e.sets.map((s) => s.video).filter((v): v is MediaAsset => !!v)) ?? []
+    return [...videos, ...(workout?.physique?.photos ?? [])].filter((m) => m.status !== 'failed')
+  }, [workout])
   const [openId, setOpenId] = useState<string | null>(null)
-  const openIndex = openId ? videos.findIndex((v) => v.id === openId) : -1
+  const openIndex = openId ? media.findIndex((m) => m.id === openId) : -1
 
   if (isPending) return <p className="muted">Loading…</p>
   if (isError || !workout) return <p className="error">Workout not found.</p>
@@ -110,10 +111,18 @@ export function WorkoutPage() {
         </section>
       ))}
 
+      {workout.physique && (
+        <section className="card physique-block">
+          <h2 className="exercise-title">Physique update</h2>
+          {workout.physique.body_weight_kg !== null && <p className="progress-weight">{formatWeight(workout.physique.body_weight_kg, unit)}</p>}
+          <MediaGrid media={workout.physique.photos.filter((p) => p.status !== 'failed')} onOpen={(a) => setOpenId(a.id)} compact />
+        </section>
+      )}
+
       {workout.notes && <div className="body">{workout.notes}</div>}
 
       {openIndex >= 0 && (
-        <Lightbox items={videos} index={openIndex} onIndexChange={(i) => setOpenId(videos[i].id)} onClose={() => setOpenId(null)} />
+        <Lightbox items={media} index={openIndex} onIndexChange={(i) => setOpenId(media[i].id)} onClose={() => setOpenId(null)} />
       )}
     </article>
   )

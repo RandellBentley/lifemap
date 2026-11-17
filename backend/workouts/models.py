@@ -85,10 +85,15 @@ class WorkoutSet(models.Model):
 
 
 class ProgressReport(models.Model):
-    """A check-in: date, body weight, notes, photos (MediaAsset with progress_report=this)."""
+    """
+    A physique update: date, body weight, notes, photos (MediaAsset with progress_report=this).
+    Either standalone, or part of a workout, in which case it's dated the workout's day and
+    edited through the workout. Deleting the workout keeps it as a standalone update.
+    """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="progress_reports")
+    workout = models.OneToOneField(Workout, null=True, blank=True, on_delete=models.SET_NULL, related_name="physique")
     recorded_on = models.DateField()
     body_weight_kg = models.DecimalField(**WEIGHT, null=True, blank=True)
     notes = models.TextField(blank=True)

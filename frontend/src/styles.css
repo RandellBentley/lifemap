@@ -994,7 +994,7 @@ img, video { max-width: 100%; display: block; }
 .workout-summary li { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .workout-summary-name { font-weight: 600; min-width: 9rem; }
 .workout-notes { margin: 0; white-space: pre-wrap; }
-.progress-card { display: flex; flex-direction: column; gap: 0.6rem; }
+.progress-card, .physique-block { display: flex; flex-direction: column; gap: 0.6rem; }
 .progress-weight { margin: 0; font-size: 1.15rem; font-weight: 600; }
 .exercise-block { display: flex; flex-direction: column; gap: 0.75rem; }
 .exercise-block-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
