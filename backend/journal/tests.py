@@ -280,6 +280,16 @@ class EventApiTests(TestCase):
         resp = self.client.patch(f"/api/events/{event['id']}/", {"cover": str(later_photo.id)}, format="json")
         self.assertIn(later_photo.s3_key, resp.data["cover_urls"]["thumb"])
 
+    def test_cover_focus(self, _delete):
+        event = self.create_event()
+        self.assertEqual((event["cover_focus_x"], event["cover_focus_y"]), (50, 50))
+        resp = self.client.patch(f"/api/events/{event['id']}/", {"cover_focus_x": 20, "cover_focus_y": 85},
+                                 format="json")
+        self.assertEqual((resp.data["cover_focus_x"], resp.data["cover_focus_y"]), (20, 85))
+        for bad in (101, -1):
+            resp = self.client.patch(f"/api/events/{event['id']}/", {"cover_focus_y": bad}, format="json")
+            self.assertEqual(resp.status_code, 400)
+
     def test_delete_keeps_entries_by_default(self, delete_objects):
         event = self.create_event()
         entry = self.create_entry("2026-07-04", event["id"])

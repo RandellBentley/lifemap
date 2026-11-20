@@ -12,13 +12,28 @@ export function formatEntryDate(entry: Pick<Entry, 'occurred_at' | 'timezone'>, 
   }).format(new Date(entry.occurred_at))
 }
 
-/** ISO timestamp -> value for <input type="datetime-local"> in the browser's zone. */
-export function toLocalInput(iso: string) {
-  return format(new Date(iso), "yyyy-MM-dd'T'HH:mm")
+/** ISO timestamp -> datetime-local value showing the wall-clock time in `timeZone`. */
+export function toZonedInput(iso: string, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(iso))
+  const p = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
 }
 
-export function fromLocalInput(value: string) {
-  return new Date(value).toISOString()
+/** Wall-clock datetime-local value in `timeZone` -> ISO timestamp. */
+export function fromZonedInput(value: string, timeZone: string) {
+  const wall = Date.parse(`${value}:00Z`)
+  // Subtract the zone's offset at that moment; the second pass settles daylight-saving edges.
+  let t = wall
+  for (let i = 0; i < 2; i++) t = wall - (Date.parse(`${toZonedInput(new Date(t).toISOString(), timeZone)}:00Z`) - t)
+  return new Date(t).toISOString()
 }
 
 /** Parse "yyyy-MM-dd" as a local calendar date (new Date("yyyy-MM-dd") would be UTC). */

@@ -2,6 +2,7 @@ import uuid
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator
 from django.db import models
 from django.utils.text import slugify
 
@@ -46,6 +47,9 @@ class Event(models.Model):
     timezone = models.CharField(max_length=64, default="UTC")
     tags = models.ManyToManyField(Tag, blank=True, related_name="events")
     cover = models.ForeignKey("MediaAsset", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    # Which part of the cover stays in view when the banner crops it, as % across and down.
+    cover_focus_x = models.PositiveSmallIntegerField(default=50, validators=[MaxValueValidator(100)])
+    cover_focus_y = models.PositiveSmallIntegerField(default=50, validators=[MaxValueValidator(100)])
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
