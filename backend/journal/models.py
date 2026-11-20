@@ -98,6 +98,17 @@ class Entry(models.Model):
         super().save(*args, **kwargs)
 
 
+MEDIA_OWNER_FIELDS = ("entry", "goal", "milestone", "workout_set", "progress_report", "personal_record")
+
+
+def _exactly_one_owner():
+    """Q that holds when exactly one of MEDIA_OWNER_FIELDS is set."""
+    condition = models.Q(pk__in=[])  # always false; OR-ed with one clause per owner
+    for owner in MEDIA_OWNER_FIELDS:
+        condition |= models.Q(**{f"{f}__isnull": f != owner for f in MEDIA_OWNER_FIELDS})
+    return condition
+
+
 class MediaAsset(models.Model):
     class Kind(models.TextChoices):
         IMAGE = "image"
@@ -111,11 +122,21 @@ class MediaAsset(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="media")
-    # Exactly one owner: a journal entry, a goal (its photo), or a goal milestone.
+    # Exactly one owner: a journal entry, a goal (its photo), a goal milestone, a workout set
+    # (its video), or a progress report (its photos). Enforced by a check constraint below.
     entry = models.ForeignKey(Entry, null=True, blank=True, on_delete=models.CASCADE, related_name="media")
     goal = models.ForeignKey("goals.Goal", null=True, blank=True, on_delete=models.CASCADE, related_name="photos")
     milestone = models.ForeignKey(
         "goals.Milestone", null=True, blank=True, on_delete=models.CASCADE, related_name="media"
+    )
+    workout_set = models.ForeignKey(
+        "workouts.WorkoutSet", null=True, blank=True, on_delete=models.CASCADE, related_name="media"
+    )
+    progress_report = models.ForeignKey(
+        "workouts.ProgressReport", null=True, blank=True, on_delete=models.CASCADE, related_name="photos"
+    )
+    personal_record = models.ForeignKey(
+        "workouts.PersonalRecord", null=True, blank=True, on_delete=models.CASCADE, related_name="media"
     )
     kind = models.CharField(max_length=10, choices=Kind.choices)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
@@ -136,14 +157,7 @@ class MediaAsset(models.Model):
     class Meta:
         ordering = ["position", "created_at"]
         constraints = [
-            models.CheckConstraint(
-                condition=(
-                    models.Q(entry__isnull=False, goal__isnull=True, milestone__isnull=True)
-                    | models.Q(entry__isnull=True, goal__isnull=False, milestone__isnull=True)
-                    | models.Q(entry__isnull=True, goal__isnull=True, milestone__isnull=False)
-                ),
-                name="media_has_exactly_one_owner",
-            )
+            models.CheckConstraint(condition=_exactly_one_owner(), name="media_has_exactly_one_owner_v3"),
         ]
 
     def __str__(self):

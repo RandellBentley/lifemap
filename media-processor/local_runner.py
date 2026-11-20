@@ -41,6 +41,27 @@ def list_keys(prefix):
         return  # created by the deploy script shortly after startup
 
 
+def process_pending(handler, done):
+    # Newest first, so fresh uploads aren't stuck behind a backlog.
+    pending = sorted(
+        ((key, modified) for key, modified in list_keys("media/originals/") if key not in done),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    if pending:
+        ensure_secret()  # Moto loses it if that container restarted on its own
+    for key, _ in pending:
+        event = {"Records": [{"s3": {"bucket": {"name": BUCKET}, "object": {"key": key}}}]}
+        try:
+            handler.handler(event, None)
+            s3.put_object(Bucket=BUCKET, Key=DONE_PREFIX + key, Body=b"")
+        except Exception as exc:  # e.g. API not up yet; retry next poll
+            print(f"Will retry {key}: {exc}", flush=True)
+            continue
+        done.add(key)
+        print(f"Processed {key}", flush=True)
+
+
 def main():
     ensure_secret()
     import handler  # after the secret exists; creates its own clients at import
@@ -48,22 +69,12 @@ def main():
     done = {key.removeprefix(DONE_PREFIX) for key, _ in list_keys(DONE_PREFIX)}
     print(f"Watching s3://{BUCKET}/media/originals/ ({len(done)} already processed)", flush=True)
     while True:
-        # Newest first, so fresh uploads aren't stuck behind a backlog.
-        pending = sorted(
-            ((key, modified) for key, modified in list_keys("media/originals/") if key not in done),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-        for key, _ in pending:
-            event = {"Records": [{"s3": {"bucket": {"name": BUCKET}, "object": {"key": key}}}]}
-            try:
-                handler.handler(event, None)
-            except Exception as exc:  # e.g. API not up yet; retry next poll
-                print(f"Will retry {key}: {exc}", flush=True)
-                continue
-            s3.put_object(Bucket=BUCKET, Key=DONE_PREFIX + key, Body=b"")
-            done.add(key)
-            print(f"Processed {key}", flush=True)
+        try:
+            process_pending(handler, done)
+        except Exception as exc:
+            # Storage hiccups must not stop the watcher. A laptop sleeping mid-request, for
+            # example, makes S3 reject the signed request with RequestTimeTooSkewed.
+            print(f"Poll failed, will retry: {exc}", flush=True)
         time.sleep(2)
 
 

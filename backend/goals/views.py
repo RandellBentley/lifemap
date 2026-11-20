@@ -4,8 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from journal.models import MediaAsset
-from journal.serializers import UploadRequestSerializer
-from journal.uploads import delete_media, issue_upload
+from journal.uploads import delete_media, replace_single_media
 from journal.views import parse_date
 
 from .markers import goal_markers
@@ -19,18 +18,6 @@ READINGS = Measurement.objects.select_related("metric")
 MEDIA = (
     MediaAsset.objects.select_related("goal", "milestone__goal").prefetch_related("tags").order_by("-created_at")
 )
-
-
-def replace_single_media(request, owner_field, owner, existing):
-    """POST: swap in a new photo/video (returns an upload ticket). DELETE: remove it."""
-    if request.method == "DELETE":
-        delete_media(existing)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    upload = UploadRequestSerializer(data=request.data)
-    upload.is_valid(raise_exception=True)
-    delete_media(existing)  # one photo per goal/milestone
-    ticket = issue_upload(request.user, upload.validated_data, **{owner_field: owner})
-    return Response(ticket, status=status.HTTP_201_CREATED)
 
 
 class GoalViewSet(viewsets.ModelViewSet):
