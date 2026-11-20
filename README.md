@@ -98,15 +98,37 @@ scripts/local-prod.sh up          # http://localhost:8780
 scripts/local-prod.sh superuser   # create a login
 scripts/local-prod.sh logs web    # follow logs (any service)
 scripts/local-prod.sh down        # stop; data is kept in infra/local/.data
-scripts/local-prod.sh reset       # stop and delete local data
+scripts/local-prod.sh reset       # stop and delete this copy's data (asks first)
+scripts/local-prod.sh backup [dir]          # copy the database and media to dir
+scripts/local-prod.sh restore <dir> [dump]  # replace local data with a backup
+scripts/local-prod.sh update [dir]          # back up, pull the latest code, rebuild
 ```
+
+**Personal and development copies.** Each checkout of the repo is its own copy of the site, with its data in its own `infra/local/.data`. To use the site for real while it's still being developed, keep two checkouts:
+
+- **Personal:** a separate clone on `main`, used day to day. Change it only with `update`.
+- **Development:** this checkout, where changes are built and tested.
+
+Give each one an `infra/local/instance.env` (copy [`instance.env.example`](infra/local/instance.env.example)). It sets the copy's name, ports and backup folder, so the two get separate containers, images and ports and can run at the same time. Without the file, a copy is called `local` and uses the ports above.
+
+**Updating the personal copy.** `update` refuses to run with uncommitted changes. Otherwise it:
+
+1. backs up to `LIFEMAP_BACKUP_DIR` (or the folder you give it);
+2. fast-forwards to the latest commit on the branch;
+3. rebuilds and migrates.
+
+It ends by printing the exact command to go back to the previous code and data if the new version misbehaves.
+
+**Backups.** Local data lives on one machine, so back it up to another disk, such as an external drive. `backup` must point outside the repository; without a folder it uses `LIFEMAP_BACKUP_DIR` from `instance.env`. It keeps the last 30 database dumps in `<dir>/db` and adds new files to `<dir>/media`. Files deleted in the app stay in the backup so older dumps still work.
+
+**Moving to AWS later.** A backup is also how local data moves to AWS: the database dump and the `media/` folder go across unchanged, because local storage uses the same file names as the real bucket. See [Move local data to AWS](docs/runbooks/migrate-local-to-aws.md).
 
 This runs **the same `infra/host/docker-compose.yml` that runs on EC2**: the Caddy origin with the secret-header check, gunicorn, `DEBUG=0`, Postgres, and the same migrate-then-start order. `infra/local/` adds local stand-ins for the AWS services around the host:
 
 | AWS | Local stand-in |
 |---|---|
-| CloudFront | `edge` (Caddy on :8780): serves the built SPA, sends `/api/*` to the origin with the secret header |
-| S3 | SeaweedFS on :9100, stored on disk in `infra/local/.data/s3` |
+| CloudFront | `edge` (Caddy on :8780 by default): serves the built SPA, sends `/api/*` to the origin with the secret header |
+| S3 | SeaweedFS on :9100 by default, stored on disk in `infra/local/.data/s3` |
 | Secrets Manager | Moto (in-memory; the processor recreates its secret on start) |
 | S3 → Lambda trigger | `media-processor` polls the bucket and runs the real `handler.py` |
 | Cognito | `AUTH_MODE=local` (admin login), or a real Cognito pool, see below |
@@ -171,6 +193,8 @@ aws cognito-idp admin-create-user --user-pool-id <id> --username you@example.com
 ```
 
 The script runs `terraform apply`, then pushes the image to ECR, then syncs `infra/host/` to S3, then runs `lifemap-deploy <tag>` on the instance over SSM. On the instance, that pulls the config, writes `.env` from Secrets Manager, runs migrations, and restarts the containers. The first deploy also builds Caddy, which takes a few minutes. Edit the files in `infra/host/` to change the server's setup; they ship with every deploy.
+
+To bring over data from the local stack, follow [Move local data to AWS](docs/runbooks/migrate-local-to-aws.md).
 
 Restore the database from a dump:
 
