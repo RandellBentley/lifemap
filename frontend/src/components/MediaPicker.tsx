@@ -15,19 +15,20 @@ interface Props {
   onRemove: (id: string) => void
   onTagsChange: (id: string, tags: string[]) => void
   disabled?: boolean
+  photosOnly?: boolean
 }
 
-const ACCEPT = 'image/*,video/*'
 
 /** Files are only queued here; the editor uploads them after the entry is saved. */
-export function MediaPicker({ queue, onAdd, onRemove, onTagsChange, disabled }: Props) {
+export function MediaPicker({ queue, onAdd, onRemove, onTagsChange, disabled, photosOnly }: Props) {
   const [dragging, setDragging] = useState(false)
+  const allowed = (f: File) => f.type.startsWith('image/') || (!photosOnly && f.type.startsWith('video/'))
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault()
     setDragging(false)
     if (disabled) return
-    onAdd([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/')))
+    onAdd([...e.dataTransfer.files].filter(allowed))
   }
 
   return (
@@ -43,7 +44,7 @@ export function MediaPicker({ queue, onAdd, onRemove, onTagsChange, disabled }: 
       >
         <input
           type="file"
-          accept={ACCEPT}
+          accept={photosOnly ? 'image/*' : 'image/*,video/*'}
           multiple
           hidden
           disabled={disabled}
@@ -52,7 +53,7 @@ export function MediaPicker({ queue, onAdd, onRemove, onTagsChange, disabled }: 
             e.target.value = ''
           }}
         />
-        <strong>Add photos or videos</strong>
+        <strong>{photosOnly ? 'Add photos' : 'Add photos or videos'}</strong>
         <span className="muted small">Drag files here or click to choose</span>
       </label>
 

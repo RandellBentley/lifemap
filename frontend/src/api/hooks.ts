@@ -1,14 +1,18 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, cursorQuery } from './client'
 import type {
+  AppConfig,
   CalendarMonth,
   Entry,
   EntryInput,
   EventInput,
+  Exercise,
+  Feature,
   Goal,
   GoalInput,
   GoalMarker,
   JournalEvent,
+  LiftPoint,
   Measurement,
   MeasurementInput,
   MediaAsset,
@@ -16,11 +20,18 @@ import type {
   MetricInput,
   Milestone,
   MilestoneInput,
+  PRRow,
   Page,
+  PersonalRecord,
+  PersonalRecordInput,
+  ProgressReport,
+  ProgressReportInput,
   Tag,
   TimelineSummary,
   User,
   WindowSlice,
+  Workout,
+  WorkoutInput,
 } from './types'
 
 /**
@@ -44,6 +55,23 @@ export function useMe() {
     },
     staleTime: 5 * 60_000,
   })
+}
+
+/** Which features this environment has on. Fixed for the life of the deployment, so fetch once. */
+export function useAppConfig() {
+  return useQuery({
+    queryKey: ['config'],
+    queryFn: () => api<AppConfig>('/config/'),
+    staleTime: Infinity,
+  })
+}
+
+/**
+ * Whether a feature is on here. False while loading, so flagged UI never flashes in.
+ * Hiding UI is cosmetic; the backend answers 404 for disabled features regardless.
+ */
+export function useFeature(name: Feature): boolean {
+  return useAppConfig().data?.features.includes(name) ?? false
 }
 
 export async function logout() {
@@ -180,7 +208,7 @@ export function useTags() {
   return useQuery({ queryKey: ['tags'], queryFn: () => api<Tag[]>('/tags/') })
 }
 
-const JOURNAL_KEYS = ['entries', 'entry', 'calendar', 'tags', 'events', 'event', 'goals', 'goal']
+const JOURNAL_KEYS = ['entries', 'entry', 'calendar', 'tags', 'events', 'event', 'goals', 'goal', 'workouts', 'workout']
 
 /**
  * Anything that changes entries or media can affect every list view.
@@ -431,6 +459,119 @@ export function useDeleteMeasurement() {
   const invalidate = useInvalidateJournal()
   return useMutation({
     mutationFn: (id: string) => api<void>(`/measurements/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate(),
+  })
+}
+
+// --- Workouts -------------------------------------------------------------------------
+
+export function useExercises() {
+  return useQuery({ queryKey: ['workouts', 'exercises'], queryFn: () => api<Exercise[]>('/workouts/exercises/') })
+}
+
+/** The heaviest made set of each workout for one lift, oldest first. */
+export function useLiftHistory(exerciseId: string | undefined) {
+  return useQuery({
+    queryKey: ['workouts', 'history', exerciseId],
+    queryFn: () => api<LiftPoint[]>(`/workouts/exercises/${exerciseId}/history/`),
+    enabled: !!exerciseId,
+  })
+}
+
+/** Adding a name you already have returns the existing exercise (case-insensitive). */
+export function useCreateExercise() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) => api<Exercise>('/workouts/exercises/', { method: 'POST', json: { name } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workouts', 'exercises'] }),
+  })
+}
+
+const workoutBusy = (w: Workout) =>
+  w.exercises.some((e) => e.sets.some((s) => s.video && isProcessing(s.video))) || !!w.physique?.photos.some(isProcessing)
+
+/** Newest first, cursor-paginated. */
+export function useWorkouts() {
+  return useInfiniteQuery({
+    queryKey: ['workouts', 'list'],
+    queryFn: ({ pageParam }) => api<Page<Workout>>(`/workouts/?${pageParam ?? ''}`),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => cursorQuery(last.next),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.pages.some((p) => p.results.some(workoutBusy))),
+  })
+}
+
+export function useWorkout(id: string | undefined) {
+  return useQuery({
+    queryKey: ['workout', id],
+    queryFn: () => api<Workout>(`/workouts/${id}/`),
+    enabled: !!id,
+    refetchInterval: (q) => pollWhile(!!q.state.data && workoutBusy(q.state.data)),
+  })
+}
+
+export function useSaveWorkout() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: WorkoutInput }) =>
+      id ? api<Workout>(`/workouts/${id}/`, { method: 'PUT', json: data }) : api<Workout>('/workouts/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeleteWorkout() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate({ passive: ['workout'] }),
+  })
+}
+
+export function useProgressReports() {
+  return useQuery({
+    queryKey: ['workouts', 'progress'],
+    queryFn: () => api<ProgressReport[]>('/workouts/progress/'),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.photos.some(isProcessing))),
+  })
+}
+
+/** The PR board (logged + detected from workouts), newest first. Polls while a video is processing. */
+export function usePersonalRecords() {
+  return useQuery({
+    queryKey: ['workouts', 'records'],
+    queryFn: () => api<PRRow[]>('/workouts/records/'),
+    refetchInterval: (q) => pollWhile(!!q.state.data?.some((r) => r.video && isProcessing(r.video))),
+  })
+}
+
+export function useSavePersonalRecord() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: PersonalRecordInput }) =>
+      id
+        ? api<PersonalRecord>(`/workouts/records/${id}/`, { method: 'PATCH', json: data })
+        : api<PersonalRecord>('/workouts/records/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeletePersonalRecord() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/records/${id}/`, { method: 'DELETE' }),
+    onSuccess: () => invalidate(),
+  })
+}
+
+export function useSaveProgressReport() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id?: string; data: ProgressReportInput }) =>
+      id
+        ? api<ProgressReport>(`/workouts/progress/${id}/`, { method: 'PATCH', json: data })
+        : api<ProgressReport>('/workouts/progress/', { method: 'POST', json: data }),
+  })
+}
+
+export function useDeleteProgressReport() {
+  const invalidate = useInvalidateJournal()
+  return useMutation({
+    mutationFn: (id: string) => api<void>(`/workouts/progress/${id}/`, { method: 'DELETE' }),
     onSuccess: () => invalidate(),
   })
 }

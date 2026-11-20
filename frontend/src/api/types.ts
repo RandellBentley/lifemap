@@ -30,6 +30,9 @@ export type MediaOwner =
   | { kind: 'entry'; id: string }
   | { kind: 'goal'; id: string; title: string; goal_id: string; date: string | null }
   | { kind: 'milestone'; id: string; title: string; goal_id: string; goal_title: string; date: string | null }
+  | { kind: 'workout_set'; id: string; workout_id: string; title: string; date: string }
+  | { kind: 'progress_report'; id: string; date: string }
+  | { kind: 'personal_record'; id: string; title: string; date: string }
 
 export interface MediaAsset {
   id: string
@@ -251,4 +254,128 @@ export interface GoalMarker {
   milestone: { id: string } | null
   thumb: string | null
   reward?: string
+}
+
+/** Per-environment switches (GET /api/config/). Mirrors KNOWN_FEATURES in backend settings. */
+export type Feature = 'workouts'
+
+export interface AppConfig {
+  features: Feature[]
+}
+
+// --- Workouts (personal site only; behind the `workouts` feature flag) -------------------
+
+export interface Exercise {
+  id: string
+  name: string
+  use_count: number
+  created_at: string
+}
+
+/** Weights are always kilograms over the API; the UI shows kg or lb. */
+export interface WorkoutSet {
+  id: string
+  reps: number
+  weight_kg: number | null
+  made: boolean // false = a missed lift
+  video: MediaAsset | null
+}
+
+export interface WorkoutExercise {
+  id: string
+  exercise: string
+  exercise_name: string
+  sets: WorkoutSet[]
+}
+
+/** One point on a lift's progress chart: that workout's heaviest made set. */
+export interface LiftPoint {
+  workout_id: string
+  date: string
+  weight_kg: number
+  reps: number
+}
+
+export const REP_TARGETS = [1, 2, 3, 5] as const
+export type RepTarget = (typeof REP_TARGETS)[number]
+
+/** A PR you log yourself; `exercise` is from the same library as workouts. */
+export interface PersonalRecord {
+  id: string
+  exercise: string
+  exercise_name: string
+  reps: RepTarget
+  weight_kg: number
+  achieved_on: string
+  video: MediaAsset | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PersonalRecordInput {
+  exercise: string
+  reps: RepTarget
+  weight_kg: number
+  achieved_on: string
+}
+
+/**
+ * One line of the PR board: a logged PR, or a workout set that beat the best so far, for one
+ * rep target. A set counts toward every target up to its reps, so one set can give several rows.
+ */
+export interface PRRow {
+  key: string
+  source: 'logged' | 'workout'
+  source_id: string // the PersonalRecord or WorkoutSet id
+  workout_id: string | null
+  exercise: string
+  exercise_name: string
+  reps: RepTarget
+  set_reps: number // e.g. a 3-rep PR from a set of 5
+  weight_kg: number
+  achieved_on: string
+  video: MediaAsset | null
+}
+
+/** A workout's optional physique update (stored as a progress report dated the workout's day). */
+export interface Physique {
+  id: string
+  body_weight_kg: number | null
+  photos: MediaAsset[]
+}
+
+export interface Workout {
+  id: string
+  performed_on: string
+  notes: string
+  exercises: WorkoutExercise[]
+  physique: Physique | null
+  created_at: string
+  updated_at: string
+}
+
+/** Nested write: ids keep existing exercises/sets (and their videos); omit them for new ones.
+ * `physique`: omit to keep it as is, null to delete it (and its photos). */
+export interface WorkoutInput {
+  performed_on: string
+  notes: string
+  exercises: { id?: string; exercise: string; sets: { id?: string; reps: number; weight_kg: number | null; made: boolean }[] }[]
+  physique?: { body_weight_kg: number | null } | null
+}
+
+export interface ProgressReport {
+  id: string
+  recorded_on: string
+  body_weight_kg: number | null
+  notes: string
+  photos: MediaAsset[]
+  workout: string | null // set when it's part of a workout, which then owns its date
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgressReportInput {
+  recorded_on: string
+  body_weight_kg: number | null
+  notes: string
 }

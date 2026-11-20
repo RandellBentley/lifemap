@@ -101,7 +101,7 @@ export function PhotosPage() {
                 <button key={asset.id} className="photo-tile" onClick={() => setOpenId(asset.id)} aria-label="Open media">
                   <MediaThumb asset={asset} />
                   {asset.kind === 'video' && <span className="badge play">▶</span>}
-                  {asset.owner.kind !== 'entry' && (
+                  {(asset.owner.kind === 'goal' || asset.owner.kind === 'milestone') && (
                     <span className="photo-owner" title={asset.owner.kind === 'milestone' ? `Milestone: ${asset.owner.title} — ${asset.owner.goal_title}` : `Goal: ${asset.owner.title}`}>
                       {asset.owner.kind === 'milestone' ? '🏁' : '🎯'} {asset.owner.title}
                     </span>
