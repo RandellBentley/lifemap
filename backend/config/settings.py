@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "accounts",
     "journal",
     "goals",
+    "workouts",
 ]
 
 MIDDLEWARE = [
