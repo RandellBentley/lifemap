@@ -4,9 +4,16 @@
 #   s3              -> S3 (SeaweedFS, stored on disk in infra/local/.data/s3)
 #   secrets         -> Secrets Manager for the processor (Moto, in-memory; recreated on start)
 #   media-processor -> the Lambda, triggered by polling instead of S3 notifications
+# Host ports come from scripts/local-prod.sh (infra/local/instance.env), so several copies of
+# the repo can run side by side.
 services:
   web:
     build: ../../backend
+    environment:
+      # Addresses the browser uses, which depend on this copy's ports.
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://localhost:${EDGE_PORT:-8780}
+      APP_BASE_URL: http://localhost:${EDGE_PORT:-8780}
+      AWS_S3_PUBLIC_ENDPOINT_URL: http://localhost:${S3_PORT:-9100}
 
   caddy:
     networks:
@@ -16,7 +23,7 @@ services:
   edge:
     image: caddy:2
     restart: unless-stopped
-    ports: ["8780:8080"] # host 8080 is commonly taken (e.g. Keycloak)
+    ports: ["${EDGE_PORT:-8780}:8080"]
     environment:
       ORIGIN_VERIFY_SECRET: ${ORIGIN_VERIFY_SECRET}
     volumes:
@@ -30,7 +37,7 @@ services:
     image: chrislusf/seaweedfs:4.48
     restart: unless-stopped
     command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data -ip.bind=0.0.0.0
-    ports: ["9100:8333"]
+    ports: ["${S3_PORT:-9100}:8333"]
     volumes:
       - ../local/.data/s3:/data
       - ../local/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
