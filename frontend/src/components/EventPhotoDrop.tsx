@@ -77,6 +77,7 @@ export function EventPhotoDrop({ queue, range, disabled }: Props) {
       </label>
 
       {queue.reading > 0 && <p className="muted small">Reading capture dates for {queue.reading} files…</p>}
+      {queue.readError && <p className="error">{queue.readError}</p>}
 
       {groups.map(([day, members]) => {
         const outside = members.filter((m) => m.outside).length
