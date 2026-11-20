@@ -41,6 +41,7 @@ export default function App() {
           <Route path="/workouts/prs/new" element={<Workouts page={<PersonalRecordEditorPage />} />} />
           <Route path="/workouts/prs/:id/edit" element={<Workouts page={<PersonalRecordEditorPage />} />} />
           <Route path="/workouts/physique" element={<Workouts page={<WorkoutsPage />} />} />
+          <Route path="/workouts/physique/:id" element={<Workouts page={<PhysiqueUpdatePage />} />} />
           <Route path="/workouts/physique/new" element={<Workouts page={<ProgressEditorPage />} />} />
           <Route path="/workouts/physique/:id/edit" element={<Workouts page={<ProgressEditorPage />} />} />
           <Route path="/workouts/new" element={<Workouts page={<WorkoutEditorPage />} />} />
@@ -60,6 +61,7 @@ const WorkoutEditorPage = lazy(() => import('./pages/WorkoutEditorPage').then((m
 const PersonalRecordEditorPage = lazy(() =>
   import('./pages/PersonalRecordEditorPage').then((m) => ({ default: m.PersonalRecordEditorPage })),
 )
+const PhysiqueUpdatePage = lazy(() => import('./pages/PhysiqueUpdatePage').then((m) => ({ default: m.PhysiqueUpdatePage })))
 const ProgressEditorPage = lazy(() => import('./pages/ProgressEditorPage').then((m) => ({ default: m.ProgressEditorPage })))
 
 const NotFound = () => <p className="muted">Page not found.</p>

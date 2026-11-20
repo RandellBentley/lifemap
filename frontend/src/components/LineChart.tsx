@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { format } from 'date-fns'
 
 const HEIGHT = 200 // includes the x-axis band, so the card never needs an inner scroll
 const MARGIN = { top: 14, right: 76, bottom: 28 } // left is measured from the tick labels
+const PHOTO_R = 20 // a hovered point with a photo grows to this radius and shows it
 
 export interface ChartPoint {
   key: string
@@ -21,6 +22,8 @@ interface Props {
   tooltip: (index: number) => ReactNode
   /** Click or Enter on a point. */
   onSelect?: (index: number) => void
+  /** A photo for a point, shown inside it while it's hovered or focused. */
+  image?: (index: number) => string | null | undefined
 }
 
 /**
@@ -28,7 +31,8 @@ interface Props {
  * point, the latest value labeled directly, an optional dashed target, and a crosshair +
  * tooltip that snaps to the nearest point (pointer or arrow keys).
  */
-export function LineChart({ points, format: fmt, name, noun, target = null, tooltip, onSelect }: Props) {
+export function LineChart({ points, format: fmt, name, noun, target = null, tooltip, onSelect, image }: Props) {
+  const clipId = `chart-photo-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [active, setActive] = useState<number | null>(null)
@@ -81,6 +85,7 @@ export function LineChart({ points, format: fmt, name, noun, target = null, tool
   }
 
   const hovered = active !== null ? points[active] : null
+  const photo = active !== null ? image?.(active) : null
   const summary = `${name}: ${points.length} ${noun} from ${format(new Date(points[0].t), 'MMM d, yyyy')} to ${format(
     new Date(last.t),
     'MMM d, yyyy',
@@ -154,6 +159,24 @@ export function LineChart({ points, format: fmt, name, noun, target = null, tool
 
           {hovered && <line className="chart-crosshair" x1={x(hovered.t)} x2={x(hovered.t)} y1={MARGIN.top} y2={MARGIN.top + plotH} />}
 
+          {hovered && photo && (
+            <g className="chart-photo" pointerEvents="none">
+              <clipPath id={clipId}>
+                <circle cx={x(hovered.t)} cy={y(hovered.value)} r={PHOTO_R} />
+              </clipPath>
+              <circle className="chart-photo-ring" cx={x(hovered.t)} cy={y(hovered.value)} r={PHOTO_R + 2} />
+              <image
+                href={photo}
+                x={x(hovered.t) - PHOTO_R}
+                y={y(hovered.value) - PHOTO_R}
+                width={PHOTO_R * 2}
+                height={PHOTO_R * 2}
+                preserveAspectRatio="xMidYMid slice"
+                clipPath={`url(#${clipId})`}
+              />
+            </g>
+          )}
+
           {/* hit layer: the whole plot, so the pointer only has to be nearest a date */}
           <rect
             className={`chart-hit ${onSelect ? 'selectable' : ''}`}
@@ -174,7 +197,7 @@ export function LineChart({ points, format: fmt, name, noun, target = null, tool
           role="status"
           style={{
             left: Math.min(Math.max(x(hovered.t), 90), width - 90),
-            top: Math.max(y(hovered.value) - 12, 0),
+            top: Math.max(y(hovered.value) - (photo ? PHOTO_R + 10 : 12), 0),
           }}
         >
           {tooltip(active)}

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Link, NavLink, useLocation } from 'react-router'
+import { Link, NavLink, useLocation, useSearchParams } from 'react-router'
 import { useDeleteProgressReport, useProgressReports, useWorkouts } from '../api/hooks'
 import type { MediaAsset, ProgressReport, Workout } from '../api/types'
 import { Lightbox } from '../components/Lightbox'
 import { LiftProgress } from '../components/LiftProgress'
 import { MediaGrid } from '../components/MediaGrid'
 import { PersonalRecords } from '../components/PersonalRecords'
+import { PhysiqueChart } from '../components/PhysiqueChart'
 import { WeightUnitToggle } from '../components/WeightUnitToggle'
 import { formatDay } from '../lib/format'
 import { formatWeight, fromKg, useWeightUnit } from '../lib/weight'
@@ -124,6 +125,9 @@ function WorkoutCard({ workout }: { workout: Workout }) {
 
 function PhysiqueList() {
   const { data: reports = [], isPending, isError } = useProgressReports()
+  // List or graph; in the URL so back/forward and reloads keep it.
+  const [params, setParams] = useSearchParams()
+  const graph = params.get('view') === 'graph'
   const photos = useMemo(() => reports.flatMap((r) => r.photos.filter((p) => p.status !== 'failed')), [reports])
   const [openId, setOpenId] = useState<string | null>(null)
   const openIndex = openId ? photos.findIndex((p) => p.id === openId) : -1
@@ -142,13 +146,33 @@ function PhysiqueList() {
   }
   return (
     <>
-      <ul className="workout-list">
-        {reports.map((r, i) => (
-          <li key={r.id}>
-            <PhysiqueCard report={r} previous={reports.slice(i + 1).find((x) => x.body_weight_kg !== null)} onOpen={(a) => setOpenId(a.id)} />
-          </li>
+      <div className="segmented view-toggle" role="radiogroup" aria-label="Show physique updates as">
+        {(['list', 'graph'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={graph === (v === 'graph')}
+            className={graph === (v === 'graph') ? 'active' : ''}
+            onClick={() => setParams(v === 'graph' ? { view: 'graph' } : {}, { replace: true })}
+          >
+            {v === 'list' ? 'List' : 'Graph'}
+          </button>
         ))}
-      </ul>
+      </div>
+      {graph ? (
+        <section className="card physique-chart">
+          <PhysiqueChart reports={reports} />
+        </section>
+      ) : (
+        <ul className="workout-list">
+          {reports.map((r, i) => (
+            <li key={r.id}>
+              <PhysiqueCard report={r} previous={reports.slice(i + 1).find((x) => x.body_weight_kg !== null)} onOpen={(a) => setOpenId(a.id)} />
+            </li>
+          ))}
+        </ul>
+      )}
       {openIndex >= 0 && (
         <Lightbox items={photos} index={openIndex} onIndexChange={(i) => setOpenId(photos[i].id)} onClose={() => setOpenId(null)} />
       )}
@@ -168,7 +192,9 @@ function PhysiqueCard({ report, previous, onOpen }: { report: ProgressReport; pr
   return (
     <div className="card progress-card">
       <div className="workout-card-head">
-        <strong>{formatDay(report.recorded_on)}</strong>
+        <Link to={`/workouts/physique/${report.id}`} className="card-title-link">
+          <strong>{formatDay(report.recorded_on)}</strong>
+        </Link>
         <div className="btn-group">
           {report.workout ? (
             // Part of a workout, so it's edited there (the workout owns its date).

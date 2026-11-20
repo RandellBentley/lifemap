@@ -939,6 +939,7 @@ img, video { max-width: 100%; display: block; }
 .chart-crosshair { stroke: var(--muted); stroke-width: 1; }
 .chart-hit { fill: transparent; cursor: crosshair; }
 .chart-hit.selectable { cursor: pointer; }
+.chart-photo-ring { fill: var(--surface); stroke: var(--chart-series); stroke-width: 2; }
 .chart-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -1053,3 +1054,9 @@ img, video { max-width: 100%; display: block; }
   .pr-tile { padding: 0.45rem 0.5rem; }
   .pr-tile strong { font-size: 0.95rem; }
 }
+
+/* Workouts → Physique: list / graph */
+.view-toggle { margin-bottom: 0.75rem; }
+.physique-chart { padding-top: 1.75rem; } /* room for an enlarged photo point at the top */
+.card-title-link { color: inherit; text-decoration: none; }
+.card-title-link:hover { text-decoration: underline; }
