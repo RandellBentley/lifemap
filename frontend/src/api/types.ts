@@ -67,6 +67,9 @@ export interface JournalEvent extends EventSummary {
   tags: string[]
   cover: string | null
   cover_urls: MediaUrls | null
+  /** Part of the cover kept in view when the banner crops it, as % across and down. */
+  cover_focus_x: number
+  cover_focus_y: number
   entry_count: number
   media_count: number
   created_at: string
@@ -81,6 +84,8 @@ export interface EventInput {
   timezone: string
   tags: string[]
   cover?: string | null
+  cover_focus_x?: number
+  cover_focus_y?: number
 }
 
 export interface Entry {

@@ -97,7 +97,11 @@ function EventView({ event, entries }: { event: JournalEvent; entries: Entry[] }
     <article className="page event-page">
       {event.cover_urls?.display && (
         <div className="event-hero">
-          <img src={event.cover_urls.display} alt="" />
+          <img
+            src={event.cover_urls.display}
+            alt=""
+            style={{ objectPosition: `${event.cover_focus_x}% ${event.cover_focus_y}%` }}
+          />
         </div>
       )}
 

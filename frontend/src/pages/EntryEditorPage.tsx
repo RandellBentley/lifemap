@@ -13,7 +13,8 @@ import {
 import { MediaPicker, type QueuedFile } from '../components/MediaPicker'
 import { DayPhotos } from '../components/DayPhotos'
 import { TagInput } from '../components/TagInput'
-import { browserTimeZone, fromLocalInput, parseDay, toLocalInput } from '../lib/dates'
+import { browserTimeZone, fromZonedInput, parseDay, toZonedInput } from '../lib/dates'
+import { TimeZoneSelect } from '../components/TimeZoneSelect'
 import { format } from 'date-fns'
 import { entryTitle, eventDayNumber, formatEventRange } from '../lib/events'
 import { uploadMedia } from '../lib/upload'
@@ -36,9 +37,12 @@ export function EntryEditorPage() {
 
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  // A wall-clock time; `zone` says where. Kept separate so changing the zone keeps the clock time.
   const [occurredAt, setOccurredAt] = useState(() =>
-    presetDate ? `${presetDate}T12:00` : toLocalInput(new Date().toISOString()),
+    presetDate ? `${presetDate}T12:00` : toZonedInput(new Date().toISOString(), browserTimeZone()),
   )
+  // null until chosen: then the entry's own zone, else its event's, else the browser's.
+  const [chosenZone, setChosenZone] = useState<string | null>(null)
   const [tags, setTags] = useState<string[]>([])
   const [eventId, setEventId] = useState<string>(fromEvent ?? '')
   const [queue, setQueue] = useState<QueuedFile[]>([])
@@ -49,12 +53,14 @@ export function EntryEditorPage() {
     if (!existing) return
     setTitle(existing.title)
     setBody(existing.body)
-    setOccurredAt(toLocalInput(existing.occurred_at))
+    setOccurredAt(toZonedInput(existing.occurred_at, existing.timezone))
+    setChosenZone(existing.timezone)
     setTags(existing.tags)
     setEventId(existing.event ?? '')
   }, [existing])
 
   const selectedEvent = events.find((e) => e.id === eventId)
+  const zone = chosenZone ?? selectedEvent?.timezone ?? browserTimeZone()
   const day = occurredAt.slice(0, 10)
   const outsideEvent = selectedEvent && eventDayNumber(selectedEvent, day) === null
   const dayNumber = selectedEvent ? eventDayNumber(selectedEvent, day) : null
@@ -80,8 +86,8 @@ export function EntryEditorPage() {
           title,
           body,
           tags,
-          occurred_at: fromLocalInput(occurredAt),
-          timezone: browserTimeZone(),
+          occurred_at: fromZonedInput(occurredAt, zone),
+          timezone: zone,
           event: eventId || null,
         },
       })
@@ -144,10 +150,16 @@ export function EntryEditorPage() {
         />
       </label>
 
-      <label className="field">
-        <span>When</span>
-        <input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required />
-      </label>
+      <div className="field-row">
+        <label className="field">
+          <span>When</span>
+          <input type="datetime-local" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} required />
+        </label>
+        <label className="field">
+          <span>Time zone</span>
+          <TimeZoneSelect value={zone} onChange={setChosenZone} />
+        </label>
+      </div>
 
       <label className="field">
         <span>Part of an event</span>

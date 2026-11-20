@@ -195,7 +195,8 @@ class EventSerializer(serializers.ModelSerializer):
         model = Event
         fields = [
             "id", "title", "description", "starts_on", "ends_on", "timezone", "tags",
-            "cover", "cover_urls", "entry_count", "media_count", "created_at", "updated_at",
+            "cover", "cover_urls", "cover_focus_x", "cover_focus_y", "entry_count", "media_count",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
 

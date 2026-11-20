@@ -13,13 +13,35 @@ export interface CaptureDate {
 // IMG_20260705_143200.jpg, PXL_20260705_143200123.mp4, 2026-07-05 14.32.00.jpg, ...
 const FILENAME_DATE = /(20\d{2})-?(\d{2})-?(\d{2})[ _T-]?(\d{2})[.:-]?(\d{2})[.:-]?(\d{2})/
 
+/**
+ * The EXIF reader couldn't be fetched. Usually the site was rebuilt since this page loaded, so
+ * the file it names no longer exists. Falling back to file timestamps here would file a whole
+ * trip under the upload day, so callers must stop and ask for a reload instead.
+ */
+class DateReaderUnavailable extends Error {
+  constructor() {
+    super(
+      'Couldn’t load the part of LifeMap that reads when photos were taken, usually because the site was ' +
+        'updated after this page was opened. Reload the page, then add the photos again.',
+    )
+  }
+}
+
+// Loaded on first use: only event photo uploads need it, so it stays out of the main bundle.
+async function loadExifr() {
+  try {
+    return (await import('exifr')).default
+  } catch {
+    throw new DateReaderUnavailable()
+  }
+}
+
 /** When a photo/video was taken: EXIF, then a date in the filename, then the file's timestamp. */
 export async function readCaptureDate(file: File): Promise<CaptureDate> {
   if (file.type.startsWith('image/')) {
+    const exifr = await loadExifr()
     try {
       // reviveValues: false keeps "YYYY:MM:DD HH:MM:SS" as written, without shifting zones.
-      // Loaded on first use: only event photo uploads need it, so it stays out of the main bundle.
-      const { default: exifr } = await import('exifr')
       const tags = await exifr.parse(file, { pick: ['DateTimeOriginal', 'CreateDate'], reviveValues: false })
       const raw: unknown = tags?.DateTimeOriginal ?? tags?.CreateDate
       if (typeof raw === 'string' && /^\d{4}:\d{2}:\d{2} \d{2}:\d{2}:\d{2}/.test(raw)) {

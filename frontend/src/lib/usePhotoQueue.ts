@@ -28,6 +28,7 @@ const PARALLEL_UPLOADS = 3
 export function usePhotoQueue() {
   const [items, setItems] = useState<QueuedPhoto[]>([])
   const [reading, setReading] = useState(0)
+  const [readError, setReadError] = useState<string | null>(null)
   const itemsRef = useRef(items)
   itemsRef.current = items
 
@@ -37,15 +38,24 @@ export function usePhotoQueue() {
   const add = useCallback(async (files: File[]) => {
     const media = files.filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'))
     setReading((n) => n + media.length)
-    const read = await Promise.all(
-      media.map(async (file) => {
-        const captured = await readCaptureDate(file)
-        setReading((n) => n - 1)
-        return { id: crypto.randomUUID(), file, capturedAt: captured.value, source: captured.source,
-                 status: 'queued' as const, progress: 0 }
-      }),
-    )
-    setItems((list) => [...list, ...read])
+    setReadError(null)
+    try {
+      const read = await Promise.all(
+        media.map(async (file) => {
+          try {
+            const captured = await readCaptureDate(file)
+            return { id: crypto.randomUUID(), file, capturedAt: captured.value, source: captured.source,
+                     status: 'queued' as const, progress: 0 }
+          } finally {
+            setReading((n) => n - 1)
+          }
+        }),
+      )
+      setItems((list) => [...list, ...read])
+    } catch (err) {
+      // Queue none of them: without dates they'd all be filed under today.
+      setReadError(errorMessage(err))
+    }
   }, [])
 
   const remove = (id: string) => setItems((list) => list.filter((item) => item.id !== id))
@@ -84,7 +94,7 @@ export function usePhotoQueue() {
     }
   }
 
-  return { items, reading, add, remove, clearFinished, uploadAll }
+  return { items, reading, readError, add, remove, clearFinished, uploadAll }
 }
 
 export type PhotoQueue = ReturnType<typeof usePhotoQueue>

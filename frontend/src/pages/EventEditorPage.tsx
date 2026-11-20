@@ -2,18 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { errorMessage } from '../api/client'
 import { useEvent, useEventEntries, useInvalidateJournal, useSaveEvent } from '../api/hooks'
+import { CoverFraming } from '../components/CoverFraming'
 import { EventPhotoDrop } from '../components/EventPhotoDrop'
 import { MediaThumb } from '../components/MediaGrid'
 import { TagInput } from '../components/TagInput'
+import { TimeZoneSelect } from '../components/TimeZoneSelect'
 import { browserTimeZone, dayKey } from '../lib/dates'
 import { describeUpload } from '../lib/events'
 import { usePhotoQueue } from '../lib/usePhotoQueue'
-
-/** Every IANA zone the browser knows (plus the current value, in case it's unusual). */
-function zoneOptions(current: string): string[] {
-  const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : []
-  return zones.includes(current) ? zones : [current, ...zones]
-}
 
 export function EventEditorPage() {
   const { id } = useParams()
@@ -33,6 +29,7 @@ export function EventEditorPage() {
   const [ongoing, setOngoing] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [cover, setCover] = useState<string | null>(null)
+  const [focus, setFocus] = useState({ x: 50, y: 50 })
   const [timeZone, setTimeZone] = useState(browserTimeZone)
   const [error, setError] = useState<string | null>(null)
 
@@ -45,10 +42,17 @@ export function EventEditorPage() {
     setOngoing(existing.ends_on === null)
     setTags(existing.tags)
     setCover(existing.cover)
+    setFocus({ x: existing.cover_focus_x, y: existing.cover_focus_y })
     setTimeZone(existing.timezone)
   }, [existing])
 
   const photos = entries.flatMap((e) => e.media).filter((m) => m.kind === 'image' && m.status !== 'failed')
+  // Same rule as the server: the chosen photo, else the first processed photo of the earliest day.
+  const coverPhoto = cover ? photos.find((p) => p.id === cover) : photos.find((p) => p.status !== 'pending')
+  const chooseCover = (id: string | null) => {
+    setCover(id)
+    setFocus({ x: 50, y: 50 }) // framing belongs to the old photo
+  }
   const endBeforeStart = !ongoing && endsOn < startsOn
 
   const onSubmit = async (e: FormEvent) => {
@@ -65,7 +69,7 @@ export function EventEditorPage() {
           ends_on: ongoing ? null : endsOn,
           tags,
           timezone: timeZone,
-          ...(isNew ? {} : { cover }),
+          ...(isNew ? {} : { cover, cover_focus_x: focus.x, cover_focus_y: focus.y }),
         },
       })
       if (queue.items.length === 0) {
@@ -142,16 +146,10 @@ export function EventEditorPage() {
 
       <label className="field">
         <span>Time zone</span>
-        <select value={timeZone} onChange={(e) => setTimeZone(e.target.value)}>
-          {zoneOptions(timeZone).map((zone) => (
-            <option key={zone} value={zone}>
-              {zone.replaceAll('_', ' ')}
-            </option>
-          ))}
-        </select>
+        <TimeZoneSelect value={timeZone} onChange={setTimeZone} />
         <span className="muted small">
-          Where the event takes place. Photos are filed by the date they were taken there; this zone is used for
-          files without a “date taken”.
+          Where most of the event takes place; new days start in this zone. Photos are filed by the local date they
+          were taken, so moving between zones is fine. A day spent elsewhere can have its own zone on its entry.
         </span>
       </label>
 
@@ -181,7 +179,7 @@ export function EventEditorPage() {
               <button
                 type="button"
                 className={`cover-option auto ${cover === null ? 'selected' : ''}`}
-                onClick={() => setCover(null)}
+                onClick={() => chooseCover(null)}
               >
                 Automatic
                 <span className="muted small">first photo</span>
@@ -191,13 +189,21 @@ export function EventEditorPage() {
                   key={asset.id}
                   type="button"
                   className={`cover-option ${cover === asset.id ? 'selected' : ''}`}
-                  onClick={() => setCover(asset.id)}
+                  onClick={() => chooseCover(asset.id)}
                   aria-label={`Use ${asset.original_filename} as cover`}
                 >
                   <MediaThumb asset={asset} />
                 </button>
               ))}
             </div>
+          )}
+          {coverPhoto?.urls.display && (
+            <CoverFraming
+              src={coverPhoto.urls.display}
+              x={focus.x}
+              y={focus.y}
+              onChange={(x, y) => setFocus({ x, y })}
+            />
           )}
         </div>
       )}
