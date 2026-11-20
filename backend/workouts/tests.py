@@ -1,0 +1,349 @@
+import datetime as dt
+from decimal import Decimal
+from unittest import mock
+
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient
+
+from accounts.models import User
+from journal.models import MediaAsset
+
+from .models import Exercise, PersonalRecord, ProgressReport, Workout, WorkoutSet
+
+VIDEO = {"filename": "set1.mov", "content_type": "video/quicktime", "size": 1000}
+PHOTO = {"filename": "front.jpg", "content_type": "image/jpeg", "size": 1000}
+LB = Decimal("0.45359237")
+
+
+@override_settings(FEATURES=frozenset({"workouts"}), MEDIA_PROCESSING_ENABLED=False)
+@mock.patch("journal.storage.presigned_upload", return_value={"url": "https://s3.test", "fields": {}})
+@mock.patch("journal.storage.object_size", return_value=1000)
+@mock.patch("journal.storage.media_url", lambda key: f"https://media.test/{key}" if key else None)
+@mock.patch("journal.storage.delete_objects")
+class WorkoutApiTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("alice")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.snatch = self.add_exercise("Snatch")
+        self.cj = self.add_exercise("Clean and Jerk")
+
+    def add_exercise(self, name):
+        resp = self.client.post("/api/workouts/exercises/", {"name": name}, format="json")
+        self.assertIn(resp.status_code, (200, 201), resp.data)
+        return resp.data
+
+    def create_workout(self, **overrides):
+        body = {
+            "performed_on": "2026-10-20",
+            "notes": "Heavy singles",
+            "exercises": [
+                {"exercise": self.snatch["id"], "sets": [{"reps": 3, "weight_kg": 60}, {"reps": 2, "weight_kg": 65}]},
+                {"exercise": self.cj["id"], "sets": [{"reps": 1, "weight_kg": 85}]},
+            ],
+            **overrides,
+        }
+        resp = self.client.post("/api/workouts/", body, format="json")
+        self.assertEqual(resp.status_code, 201, resp.data)
+        return resp.data
+
+    def upload_video(self, set_id):
+        ticket = self.client.post(f"/api/workouts/sets/{set_id}/video/", VIDEO, format="json")
+        self.assertEqual(ticket.status_code, 201, ticket.data)
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        return ticket.data["asset"]["id"]
+
+    # --- exercise library ---------------------------------------------------------------
+
+    def test_exercise_library_is_case_insensitive_and_sorted(self, *_):
+        again = self.client.post("/api/workouts/exercises/", {"name": "  sNATCH "}, format="json")
+        self.assertEqual((again.status_code, again.data["id"]), (200, self.snatch["id"]))  # existing returned
+        self.add_exercise("Back Squat")
+        names = [e["name"] for e in self.client.get("/api/workouts/exercises/").data]
+        self.assertEqual(names, ["Back Squat", "Clean and Jerk", "Snatch"])
+        clash = self.client.patch(f"/api/workouts/exercises/{self.cj['id']}/", {"name": "snatch"}, format="json")
+        self.assertEqual(clash.status_code, 400)
+
+    def test_used_exercise_cannot_be_deleted_but_can_be_renamed(self, *_):
+        self.create_workout()
+        self.assertEqual(self.client.delete(f"/api/workouts/exercises/{self.snatch['id']}/").status_code, 409)
+        renamed = self.client.patch(f"/api/workouts/exercises/{self.snatch['id']}/", {"name": "Power Snatch"},
+                                    format="json")
+        self.assertEqual(renamed.data["use_count"], 1)
+        unused = self.add_exercise("Front Squat")
+        self.assertEqual(self.client.delete(f"/api/workouts/exercises/{unused['id']}/").status_code, 204)
+
+    # --- workouts -----------------------------------------------------------------------
+
+    def test_user_with_workouts_can_be_deleted(self, *_):
+        self.create_workout()
+        self.user.delete()
+        self.assertFalse(Exercise.objects.exists())
+
+    def test_lift_history_charts_the_heaviest_made_set_per_workout(self, *_):
+        self.create_workout(performed_on="2026-10-22", exercises=[{"exercise": self.snatch["id"], "sets": [
+            {"reps": 2, "weight_kg": 70}, {"reps": 1, "weight_kg": 75}, {"reps": 3, "weight_kg": 75},
+            {"reps": 1, "weight_kg": 80, "made": False},  # a miss isn't progress
+        ]}])
+        self.create_workout()  # 2026-10-20: snatch 60 x3, 65 x2
+        self.create_workout(performed_on="2026-10-24", exercises=[{"exercise": self.snatch["id"], "sets": [{"reps": 5}]}])
+        history = self.client.get(f"/api/workouts/exercises/{self.snatch['id']}/history/").json()
+        self.assertEqual([(h["date"], h["weight_kg"], h["reps"]) for h in history],
+                         [("2026-10-20", 65, 2), ("2026-10-22", 75, 3)])  # bodyweight-only workout left out
+        self.assertEqual(self.client.get(f"/api/workouts/exercises/{self.cj['id']}/history/").json()[0]["weight_kg"], 85)
+
+        other = APIClient()
+        other.force_authenticate(User.objects.create_user("bob"))
+        self.assertEqual(other.get(f"/api/workouts/exercises/{self.snatch['id']}/history/").status_code, 404)
+
+    def test_create_and_list_workout(self, *_):
+        workout = self.create_workout()
+        self.assertEqual([e["exercise_name"] for e in workout["exercises"]], ["Snatch", "Clean and Jerk"])
+        self.assertEqual([(s["reps"], s["weight_kg"]) for s in workout["exercises"][0]["sets"]], [(3, 60), (2, 65)])
+        self.create_workout(performed_on="2026-10-22", exercises=[{"exercise": self.cj["id"], "sets": [{"reps": 5}]}])
+        listed = self.client.get("/api/workouts/").data["results"]
+        self.assertEqual([w["performed_on"] for w in listed], ["2026-10-22", "2026-10-20"])
+        self.assertIsNone(listed[0]["exercises"][0]["sets"][0]["weight_kg"])  # bodyweight set
+
+    def test_sets_are_made_unless_marked_missed(self, *_):
+        workout = self.create_workout(exercises=[
+            {"exercise": self.snatch["id"], "sets": [{"reps": 1, "weight_kg": 80}, {"reps": 1, "weight_kg": 85, "made": False}]},
+        ])
+        sets = workout["exercises"][0]["sets"]
+        self.assertEqual([s["made"] for s in sets], [True, False])
+        # Editing a missed set into a made one, as the editor's toggle does.
+        sets[1]["made"] = True
+        exercises = [{"id": workout["exercises"][0]["id"], "exercise": self.snatch["id"], "sets": sets}]
+        resp = self.client.put(f"/api/workouts/{workout['id']}/", {**workout, "exercises": exercises}, format="json")
+        self.assertEqual([s["made"] for s in resp.data["exercises"][0]["sets"]], [True, True])
+
+    def test_pounds_round_trip_exactly(self, *_):
+        kg = (Decimal(225) * LB).quantize(Decimal("0.0001"))  # what the frontend sends for 225 lb
+        workout = self.create_workout(exercises=[{"exercise": self.snatch["id"], "sets": [{"reps": 1, "weight_kg": kg}]}])
+        stored = Decimal(str(workout["exercises"][0]["sets"][0]["weight_kg"]))
+        self.assertEqual(round(stored / LB, 2), Decimal("225.00"))
+
+    def test_update_keeps_set_ids_and_videos_and_removes_dropped_sets(self, delete_objects, *_):
+        workout = self.create_workout()
+        snatch = workout["exercises"][0]
+        first, second = snatch["sets"]
+        video = self.upload_video(first["id"])
+        self.upload_video(second["id"])
+        delete_objects.reset_mock()
+
+        body = {"exercises": [
+            # Keep the first snatch set (edited) and add a new one; drop the second set and the C&J.
+            {"id": snatch["id"], "exercise": self.snatch["id"],
+             "sets": [{"id": first["id"], "reps": 3, "weight_kg": 62.5}, {"reps": 1, "weight_kg": 70}]},
+        ]}
+        resp = self.client.patch(f"/api/workouts/{workout['id']}/", body, format="json")
+        self.assertEqual(resp.status_code, 200, resp.data)
+        sets = resp.data["exercises"][0]["sets"]
+        self.assertEqual(len(resp.data["exercises"]), 1)
+        self.assertEqual((sets[0]["id"], sets[0]["weight_kg"], sets[0]["video"]["id"]), (first["id"], 62.5, video))
+        self.assertEqual((sets[1]["reps"], sets[1]["video"]), (1, None))
+        self.assertFalse(WorkoutSet.objects.filter(pk=second["id"]).exists())
+        self.assertEqual(MediaAsset.objects.filter(workout_set__isnull=False).count(), 1)  # dropped set's video gone
+        self.assertTrue(delete_objects.called)
+
+    def test_validation(self, *_):
+        bad = lambda body: self.client.post("/api/workouts/", {"performed_on": "2026-10-20", **body}, format="json")  # noqa: E731
+        self.assertEqual(bad({"exercises": []}).status_code, 400)
+        self.assertEqual(bad({"exercises": [{"exercise": self.snatch["id"], "sets": []}]}).status_code, 400)
+        self.assertEqual(bad({"exercises": [{"exercise": self.snatch["id"], "sets": [{"reps": -1}]}]}).status_code, 400)
+        workout = self.create_workout()
+        foreign_set = {"exercises": [{"exercise": self.snatch["id"],
+                                      "sets": [{"id": "00000000-0000-0000-0000-000000000000", "reps": 1}]}]}
+        self.assertEqual(self.client.patch(f"/api/workouts/{workout['id']}/", foreign_set, format="json").status_code, 400)
+
+    def test_set_video_replace_remove_and_video_only(self, *_):
+        set_id = self.create_workout()["exercises"][0]["sets"][0]["id"]
+        old = self.upload_video(set_id)
+        new = self.upload_video(set_id)
+        self.assertFalse(MediaAsset.objects.filter(pk=old).exists())
+        self.assertEqual(self.client.get("/api/workouts/").data["results"][0]["exercises"][0]["sets"][0]["video"]["id"], new)
+        self.assertEqual(self.client.post(f"/api/workouts/sets/{set_id}/video/", PHOTO, format="json").status_code, 400)
+        self.assertEqual(self.client.delete(f"/api/workouts/sets/{set_id}/video/").status_code, 204)
+        self.assertFalse(MediaAsset.objects.filter(workout_set_id=set_id).exists())
+
+    def test_delete_workout_removes_set_videos(self, delete_objects, *_):
+        workout = self.create_workout()
+        self.upload_video(workout["exercises"][0]["sets"][0]["id"])
+        delete_objects.reset_mock()
+        self.assertEqual(self.client.delete(f"/api/workouts/{workout['id']}/").status_code, 204)
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertEqual(len(delete_objects.call_args.args[0]), 1)
+
+    # --- progress reports ---------------------------------------------------------------
+
+    def test_progress_report_with_photos(self, delete_objects, *_):
+        resp = self.client.post("/api/workouts/progress/", {"recorded_on": "2026-10-01", "body_weight_kg": 81.2,
+                                                            "notes": "Week 4"}, format="json")
+        self.assertEqual(resp.status_code, 201, resp.data)
+        report = resp.data
+        for _i in range(2):
+            ticket = self.client.post(f"/api/workouts/progress/{report['id']}/photos/", PHOTO, format="json")
+            self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        self.assertEqual(self.client.post(f"/api/workouts/progress/{report['id']}/photos/", VIDEO,
+                                          format="json").status_code, 400)
+        listed = self.client.get("/api/workouts/progress/").json()  # what the browser gets: a plain number
+        self.assertEqual((listed[0]["body_weight_kg"], len(listed[0]["photos"])), (81.2, 2))
+        self.assertEqual(listed[0]["photos"][0]["owner"], {"kind": "progress_report", "id": report["id"],
+                                                           "date": "2026-10-01"})
+        delete_objects.reset_mock()
+        self.client.delete(f"/api/workouts/progress/{report['id']}/")
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertEqual(len(delete_objects.call_args.args[0]), 2)
+
+    def test_workout_with_physique_update(self, delete_objects, *_):
+        workout = self.create_workout(physique={"body_weight_kg": 82.5})
+        physique = workout["physique"]
+        self.assertEqual((physique["body_weight_kg"], physique["photos"]), (82.5, []))
+        for _i in range(2):
+            ticket = self.client.post(f"/api/workouts/progress/{physique['id']}/photos/", PHOTO, format="json")
+            self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        url = f"/api/workouts/{workout['id']}/"
+
+        # Saving the workout without `physique` keeps it, photos included, and moves it to the new date.
+        resp = self.client.patch(url, {"performed_on": "2026-10-21"}, format="json").json()
+        self.assertEqual((resp["physique"]["id"], len(resp["physique"]["photos"])), (physique["id"], 2))
+        report = self.client.get("/api/workouts/progress/").json()[0]
+        self.assertEqual((report["recorded_on"], report["workout"]), ("2026-10-21", workout["id"]))
+        # Its date belongs to the workout.
+        moved = self.client.patch(f"/api/workouts/progress/{physique['id']}/", {"recorded_on": "2026-10-01"}, format="json")
+        self.assertEqual(moved.status_code, 400)
+
+        resp = self.client.patch(url, {"physique": {"body_weight_kg": 83}}, format="json").json()
+        self.assertEqual((resp["physique"]["id"], resp["physique"]["body_weight_kg"]), (physique["id"], 83))
+
+        # Deleting the workout keeps the update as a standalone one.
+        self.client.delete(url)
+        report = self.client.get("/api/workouts/progress/").json()[0]
+        self.assertEqual((report["workout"], len(report["photos"])), (None, 2))
+
+    def test_removing_physique_update_deletes_its_photos(self, delete_objects, *_):
+        workout = self.create_workout(physique={"body_weight_kg": None})
+        ticket = self.client.post(f"/api/workouts/progress/{workout['physique']['id']}/photos/", PHOTO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        resp = self.client.patch(f"/api/workouts/{workout['id']}/", {"physique": None}, format="json").json()
+        self.assertIsNone(resp["physique"])
+        self.assertFalse(ProgressReport.objects.exists())
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertIsNone(self.create_workout()["physique"])  # optional
+
+    def test_workout_media_stays_off_the_photos_page(self, *_):
+        self.upload_video(self.create_workout()["exercises"][0]["sets"][0]["id"])
+        report = ProgressReport.objects.create(user=self.user, recorded_on=dt.date(2026, 10, 1))
+        ticket = self.client.post(f"/api/workouts/progress/{report.id}/photos/", PHOTO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        record = self.client.post("/api/workouts/records/", {"exercise": self.snatch["id"], "weight_kg": 80,
+                                                              "achieved_on": "2026-10-02"}, format="json").data
+        ticket = self.client.post(f"/api/workouts/records/{record['id']}/video/", VIDEO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        self.assertEqual(self.client.get("/api/media/").data["results"], [])
+
+    # --- PRs ----------------------------------------------------------------------------
+
+    def test_personal_records(self, delete_objects, *_):
+        url = "/api/workouts/records/"
+        first = self.client.post(url, {"exercise": self.snatch["id"], "weight_kg": 80, "achieved_on": "2026-09-01"},
+                                 format="json")
+        self.assertEqual(first.status_code, 201, first.data)
+        self.client.post(url, {"exercise": self.snatch["id"], "weight_kg": 85, "achieved_on": "2026-10-01"},
+                         format="json")
+        listed = self.client.get(url).json()
+        self.assertEqual([(r["exercise_name"], r["weight_kg"], r["achieved_on"]) for r in listed],
+                         [("Snatch", 85, "2026-10-01"), ("Snatch", 80, "2026-09-01")])  # newest first
+
+        record = first.data["id"]
+        self.assertEqual(self.client.post(f"{url}{record}/video/", PHOTO, format="json").status_code, 400)
+        ticket = self.client.post(f"{url}{record}/video/", VIDEO, format="json")
+        self.client.post(f"/api/media/{ticket.data['asset']['id']}/complete/")
+        video = self.client.get(f"{url}{record}/").json()["video"]
+        self.assertEqual(video["owner"], {"kind": "personal_record", "id": record, "title": "Snatch",
+                                          "date": "2026-09-01"})
+
+        # A lift with PRs can't be deleted (rename it instead); deleting the PR removes its video.
+        self.assertEqual(self.client.delete(f"/api/workouts/exercises/{self.snatch['id']}/").status_code, 409)
+        delete_objects.reset_mock()
+        self.client.delete(f"{url}{record}/")
+        self.assertFalse(MediaAsset.objects.exists())
+        self.assertEqual(len(delete_objects.call_args.args[0]), 1)
+
+    def test_prs_are_detected_from_workouts(self, *_):
+        def log(day, *sets):
+            self.create_workout(performed_on=day, exercises=[{"exercise": self.snatch["id"], "sets": [
+                {"reps": r, "weight_kg": w, "made": made} for r, w, made in sets]}])
+
+        log("2026-09-01", (3, 60, True))         # first time: PRs for 1, 2 and 3 reps
+        log("2026-09-15", (5, 62, True))         # beats 1-3 and sets the first 5
+        log("2026-09-20", (1, 61, True))         # below the 62 already done for 5
+        log("2026-09-25", (1, 70, False))        # missed lifts don't count
+        log("2026-10-01", (2, 65, True), (2, 65, True))  # only the first of two equal sets
+        self.client.post("/api/workouts/records/", {"exercise": self.snatch["id"], "reps": 1, "weight_kg": 80,
+                                                     "achieved_on": "2026-10-05"}, format="json")
+        log("2026-10-10", (1, 75, True))         # below the logged 80
+
+        rows = self.client.get("/api/workouts/records/").json()
+        self.assertEqual([(r["achieved_on"], r["reps"], r["weight_kg"], r["source"], r["set_reps"]) for r in rows], [
+            ("2026-10-05", 1, 80, "logged", 1),
+            ("2026-10-01", 2, 65, "workout", 2), ("2026-10-01", 1, 65, "workout", 2),
+            ("2026-09-15", 5, 62, "workout", 5), ("2026-09-15", 3, 62, "workout", 5),
+            ("2026-09-15", 2, 62, "workout", 5), ("2026-09-15", 1, 62, "workout", 5),
+            ("2026-09-01", 3, 60, "workout", 3), ("2026-09-01", 2, 60, "workout", 3),
+            ("2026-09-01", 1, 60, "workout", 3),
+        ])
+        self.assertTrue(all(r["workout_id"] for r in rows if r["source"] == "workout"))
+
+        # Derived, not stored: deleting the workout takes its PRs with it.
+        self.client.delete(f"/api/workouts/{rows[1]['workout_id']}/")
+        rows = self.client.get("/api/workouts/records/").json()
+        self.assertNotIn("2026-10-01", [r["achieved_on"] for r in rows])
+
+    def test_personal_record_validation(self, *_):
+        url = "/api/workouts/records/"
+        missing = self.client.post(url, {"exercise": self.snatch["id"]}, format="json")
+        self.assertEqual(set(missing.data), {"weight_kg", "achieved_on"})
+        four = self.client.post(url, {"exercise": self.snatch["id"], "reps": 4, "weight_kg": 80,
+                                      "achieved_on": "2026-09-01"}, format="json")
+        self.assertIn("reps", four.data)  # PRs are for 1, 2, 3 or 5 reps
+        other = Exercise.objects.create(user=User.objects.create_user("bob"), name="Snatch")
+        stolen = self.client.post(url, {"exercise": str(other.id), "weight_kg": 80, "achieved_on": "2026-09-01"},
+                                  format="json")
+        self.assertIn("exercise", stolen.data)
+        self.assertFalse(PersonalRecord.objects.exists())
+
+    # --- isolation ----------------------------------------------------------------------
+
+    def test_other_users_data_is_invisible(self, *_):
+        other = User.objects.create_user("bob")
+        theirs = Exercise.objects.create(user=other, name="Deadlift")
+        workout = Workout.objects.create(user=other, performed_on=dt.date(2026, 1, 1))
+        report = ProgressReport.objects.create(user=other, recorded_on=dt.date(2026, 1, 1))
+        self.assertEqual([e["name"] for e in self.client.get("/api/workouts/exercises/").data], ["Clean and Jerk", "Snatch"])
+        self.assertEqual(self.client.get(f"/api/workouts/{workout.id}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/workouts/progress/{report.id}/").status_code, 404)
+        uses_theirs = {"performed_on": "2026-10-20", "exercises": [{"exercise": str(theirs.id), "sets": [{"reps": 1}]}]}
+        self.assertEqual(self.client.post("/api/workouts/", uses_theirs, format="json").status_code, 400)
+
+
+class WorkoutFeatureFlagTests(TestCase):
+    """With the flag off (the public demo), every workouts endpoint is a 404."""
+
+    ENDPOINTS = ["/api/workouts/", "/api/workouts/exercises/", "/api/workouts/progress/", "/api/workouts/records/",
+                 "/api/workouts/00000000-0000-0000-0000-000000000000/",
+                 "/api/workouts/sets/00000000-0000-0000-0000-000000000000/video/"]
+
+    @override_settings(FEATURES=frozenset())
+    def test_all_endpoints_404_when_disabled(self):
+        signed_in = APIClient()
+        signed_in.force_authenticate(User.objects.create_user("alice"))
+        for client in (signed_in, APIClient()):
+            for url in self.ENDPOINTS:
+                with self.subTest(url=url, signed_in=client is signed_in):
+                    resp = client.post(url, {}, format="json") if url.endswith("video/") else client.get(url)
+                    self.assertEqual(resp.status_code, 404)
+
+    @override_settings(FEATURES=frozenset({"workouts"}))
+    def test_enabled_but_signed_out_is_403(self):
+        self.assertEqual(APIClient().get("/api/workouts/").status_code, 403)

@@ -119,6 +119,8 @@ module "host" {
   origin_domain  = local.origin_domain
   acme_email     = var.acme_email
   instance_type  = var.instance_type
+  # Personal-only features; the public demo environment leaves this empty.
+  features = ["workouts"]
 
   origin_verify_secret       = random_password.origin_verify.result
   media_bucket_id            = module.storage.media_bucket_id
