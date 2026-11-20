@@ -152,10 +152,13 @@ export function LineChart({ points, format: fmt, name, noun, target = null, tool
             )
           })}
 
-          {/* direct label on the latest value only */}
-          <text className="chart-end-label" x={x(last.t) + 10} y={y(last.value)} dominantBaseline="middle">
-            {fmt(last.value)}
-          </text>
+          {/* direct label on the latest value only (hidden while an enlarged photo point covers it;
+              the tooltip shows the value then) */}
+          {!(photo && active === points.length - 1) && (
+            <text className="chart-end-label" x={x(last.t) + 10} y={y(last.value)} dominantBaseline="middle">
+              {fmt(last.value)}
+            </text>
+          )}
 
           {hovered && <line className="chart-crosshair" x1={x(hovered.t)} x2={x(hovered.t)} y1={MARGIN.top} y2={MARGIN.top + plotH} />}
 
@@ -177,12 +180,13 @@ export function LineChart({ points, format: fmt, name, noun, target = null, tool
             </g>
           )}
 
-          {/* hit layer: the whole plot, so the pointer only has to be nearest a date */}
+          {/* hit layer: the whole plot, so the pointer only has to be nearest a date. It extends past
+              both ends so the first and last points, which sit on the edges, are fully clickable. */}
           <rect
             className={`chart-hit ${onSelect ? 'selectable' : ''}`}
-            x={left}
+            x={left - PHOTO_R}
             y={MARGIN.top}
-            width={plotW}
+            width={plotW + PHOTO_R * 2}
             height={plotH}
             onPointerMove={(e) => setActive(pointerIndex(e))}
             onPointerLeave={() => setActive(null)}

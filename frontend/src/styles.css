@@ -1056,7 +1056,7 @@ img, video { max-width: 100%; display: block; }
 }
 
 /* Workouts → Physique: list / graph */
-.view-toggle { margin-bottom: 0.75rem; }
+.view-toggle { align-self: flex-start; margin-bottom: 0.75rem; }
 .physique-chart { padding-top: 1.75rem; } /* room for an enlarged photo point at the top */
 .card-title-link { color: inherit; text-decoration: none; }
 .card-title-link:hover { text-decoration: underline; }

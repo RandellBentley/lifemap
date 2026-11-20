@@ -100,7 +100,7 @@ export function PhysiqueUpdatePage() {
           <p className="muted">No body weight recorded.</p>
         )}
         {report.notes && <p className="workout-notes">{report.notes}</p>}
-        <MediaGrid media={photos} onOpen={(a) => setOpenId(a.id)} />
+        <MediaGrid media={photos} onOpen={(a) => setOpenId(a.id)} compact />
       </section>
 
       {openIndex >= 0 && (
